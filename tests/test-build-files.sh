@@ -42,6 +42,19 @@ assert_command_fails_contains() {
     [[ "$output" == *"$needle"* ]] || fail "expected command failure to contain: $needle"
 }
 
+extract_makefile_default_admin_hash() {
+    local path="$REPO_ROOT/Makefile"
+    local value
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    value="$(sed -n 's/^export ADMIN_PASSWORD_HASH ?= //p' "$path")"
+    [[ -n "$value" ]] || fail "failed to extract ADMIN_PASSWORD_HASH default from $path"
+
+    value="${value//\$\$/\$}"
+    printf '%s' "$value"
+}
+
 test_containerfile() {
     local path="$REPO_ROOT/Containerfile"
 
@@ -99,12 +112,14 @@ test_make_iso_operator_interface() {
     local output_dir
     local log_dir
     local config_capture
+    local default_hash
     local output
 
     stub_dir="$(mktemp -d)"
     output_dir=".test-output-make-iso"
     log_dir="$(mktemp -d)"
     config_capture="$log_dir/rendered-config.toml"
+    default_hash="$(extract_makefile_default_admin_hash)"
 
     cat >"$stub_dir/sudo" <<'EOF'
 #!/usr/bin/env bash
@@ -167,6 +182,20 @@ EOF
         make \
         OUTPUT_DIR="$output_dir" \
         iso
+
+    output="$(
+        env \
+            PATH="$stub_dir:$PATH" \
+            TEST_LOG_DIR="$log_dir" \
+            INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
+            make \
+            OUTPUT_DIR="$output_dir" \
+            iso
+    )" || fail "expected make iso to succeed with only INSTALL_LUKS_PASSPHRASE set"
+
+    [[ -f "$config_capture" ]] || fail "expected fake podman to capture rendered config"
+    assert_file_contains "$config_capture" "user --name=netf --groups=wheel --iscrypted --password='$default_hash'"
+    [[ "$output" == *"ISO ready: $output_dir/bootiso/install.iso"* ]] || fail "expected make iso success output"
 
     output="$(
         env \
