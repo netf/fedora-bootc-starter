@@ -1,0 +1,280 @@
+name: build
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * *" # nightly; catches upstream regressions
+  workflow_dispatch:
+    inputs:
+      fedora_version:
+        description: "Fedora version (default 44)"
+        default: "44"
+        required: false
+
+env:
+  FEDORA_VERSION: ${{ inputs.fedora_version || '44' }}
+  IMAGE_NAME: fedora-bootc-starter
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3
+        with:
+          dockerfile: Containerfile
+
+      - name: shellcheck + bash -n
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y shellcheck
+          shellcheck -x bootstrap/*.sh bootstrap/lib/*.sh scripts/*.sh
+          for f in bootstrap/*.sh bootstrap/lib/*.sh scripts/*.sh; do
+            bash -n "$f"
+          done
+
+      - name: yamllint
+        run: |
+          sudo apt-get install -y yamllint
+          yamllint .github/workflows/ files/usr/etc/containers/registries.d/
+
+      - name: TOML parse
+        run: |
+          python3 -c "import tomllib; tomllib.load(open('config.toml','rb'))"
+          python3 -c "import tomllib; tomllib.load(open('config-ci.toml','rb'))"
+
+  build:
+    needs: lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE_REF: ghcr.io/${{ github.repository_owner }}/fedora-bootc-starter:${{ inputs.fedora_version || '44' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /opt/hostedtoolcache /usr/share/dotnet /usr/local/lib/android
+          sudo docker system prune -af || true
+          df -h /
+
+      - name: Install podman + cosign
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y podman
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Login to ghcr.io
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Verify cosign.pub is committed
+        run: |
+          test -f cosign.pub \
+            || (echo "cosign.pub missing - run scripts/bootstrap-cosign.sh" && exit 1)
+
+      - name: Build
+        run: sudo podman build --build-arg FEDORA_VERSION=$FEDORA_VERSION -t $IMAGE_REF .
+
+      - name: bootc container lint
+        run: sudo podman run --rm $IMAGE_REF bootc container lint
+
+      - name: Smoke test (positive + negative assertions, initramfs)
+        run: |
+          sudo podman run --rm $IMAGE_REF bash -c '
+            set -e
+
+            test -x /usr/share/bootstrap/run-all.sh
+            for s in 00-sanity 05-firmware-update 10-luks-tpm2 11-luks-fido2 \
+                     12-luks-recovery 13-luks-wipe-installer 30-fingerprint-enroll \
+                     40-framework-ec; do
+              test -x /usr/share/bootstrap/$s.sh
+              bash -n /usr/share/bootstrap/$s.sh
+            done
+            test -f /usr/share/bootstrap/lib/common.sh
+
+            test -f /usr/lib/bootc/kargs.d/10-fw13.toml
+            grep -q intel_iommu /usr/lib/bootc/kargs.d/10-fw13.toml
+
+            systemctl is-enabled netf-bootstrap.service
+
+            test -f /usr/etc/containers/policy.json
+            test -f /usr/etc/containers/pubkey.pem
+            grep -q /usr/etc/containers/pubkey.pem /usr/etc/containers/policy.json
+            test -f /usr/etc/containers/registries.d/ghcr-io-netf.yaml
+
+            command -v chezmoi mise alacritty distrobox tailscale tpm2_pcrread \
+                       ykman fido2-token fwupdmgr framework_tool fprintd-enroll \
+                       sbctl restic bpftool bpftrace kdeconnectd iio-sensor-proxy
+
+            ! command -v eza
+            ! command -v bat
+            ! command -v rg
+            ! command -v fd
+            ! command -v jq
+            ! command -v starship
+
+            KVER=$(ls /usr/lib/modules | head -1)
+            lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -qE "tpm2|cryptsetup"
+
+            echo "smoke tests pass"
+          '
+
+      - name: Push + sign DIGEST (main only)
+        if: github.ref == 'refs/heads/main'
+        env:
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          sudo podman push $IMAGE_REF
+          DIGEST=$(sudo podman inspect --format '{{index .RepoDigests 0}}' $IMAGE_REF)
+          test -n "$DIGEST"
+          echo "Signing $DIGEST"
+          echo "${{ secrets.COSIGN_PRIVATE_KEY }}" > /tmp/cosign.key
+          cosign sign --yes --key /tmp/cosign.key "$DIGEST"
+          rm -f /tmp/cosign.key
+
+  e2e-vm:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /opt/hostedtoolcache /usr/share/dotnet /usr/local/lib/android
+          sudo docker system prune -af || true
+          df -h /
+
+      - name: Install QEMU + swtpm + OVMF
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+              qemu-system-x86 qemu-utils ovmf \
+              swtpm swtpm-tools \
+              podman netcat-openbsd openssh-client
+
+      - name: Verify /dev/kvm available
+        run: |
+          test -c /dev/kvm || { echo "ERROR: /dev/kvm not present on runner"; exit 1; }
+          sudo chmod 666 /dev/kvm
+
+      - name: Build image (local tag only)
+        run: sudo podman build --build-arg FEDORA_VERSION=$FEDORA_VERSION -t localhost/test-image:ci .
+
+      - name: Generate CI SSH keypair
+        run: ssh-keygen -t ed25519 -N '' -f ci-key -C "ci@github-actions"
+
+      - name: Render config-ci.toml with CI pubkey
+        run: |
+          sed "s|{{CI_PUBKEY}}|$(cat ci-key.pub)|g" config-ci.toml > config-ci-rendered.toml
+          cat config-ci-rendered.toml
+
+      - name: Build qcow2
+        run: |
+          mkdir -p output
+          sudo podman run --rm --privileged --pull=newer \
+              --security-opt label=type:unconfined_t \
+              -v /var/lib/containers/storage:/var/lib/containers/storage \
+              -v $PWD/config-ci-rendered.toml:/config.toml:ro \
+              -v $PWD/output:/output \
+              quay.io/centos-bootc/bootc-image-builder:latest \
+              --type qcow2 --config /config.toml \
+              localhost/test-image:ci
+          sudo chown -R "$USER" output
+          ls -lh output/qcow2/
+
+      - name: Start swtpm (emulated TPM2)
+        run: |
+          mkdir -p /tmp/swtpm
+          swtpm socket --tpm2 --tpmstate dir=/tmp/swtpm \
+              --ctrl type=unixio,path=/tmp/swtpm/sock \
+              --log level=5 --daemon
+
+      - name: Boot VM in background
+        run: |
+          qemu-system-x86_64 \
+            -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
+            -drive if=pflash,format=raw,file=/usr/share/OVMF/OVMF_VARS.fd \
+            -chardev socket,id=chrtpm,path=/tmp/swtpm/sock \
+            -tpmdev emulator,id=tpm0,chardev=chrtpm \
+            -device tpm-crb,tpmdev=tpm0 \
+            -drive file=output/qcow2/disk.qcow2,if=virtio,format=qcow2 \
+            -netdev user,id=n0,hostfwd=tcp::2222-:22 \
+            -device virtio-net-pci,netdev=n0 \
+            -nographic -serial file:vm-serial.log \
+            -display none &
+          echo $! > qemu.pid
+          sleep 5
+
+      - name: Wait for SSH (up to 5 min)
+        run: |
+          for i in {1..30}; do
+            if ssh -i ci-key -o StrictHostKeyChecking=no \
+                   -o UserKnownHostsFile=/dev/null \
+                   -o ConnectTimeout=5 \
+                   -p 2222 netf@localhost true 2>/dev/null; then
+              echo "SSH up after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "SSH never came up"
+          tail -n 200 vm-serial.log
+          exit 1
+
+      - name: Verify system state in VM
+        run: |
+          SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 netf@localhost"
+
+          echo "Basic system"
+          $SSH 'cat /etc/os-release | grep VERSION'
+          $SSH 'bootc status'
+          $SSH 'systemctl is-system-running || true'
+
+          echo "Image-baked tooling"
+          $SSH 'command -v chezmoi mise alacritty framework_tool'
+          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbctl'
+
+          echo "TPM2 visible via swtpm"
+          $SSH 'sudo tpm2_pcrread sha256:7,11'
+
+          echo "sbctl status readable"
+          $SSH 'sudo sbctl status || true'
+
+          echo "Hardware-gated scripts skip gracefully"
+          $SSH 'sudo /usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
+          $SSH 'sudo /usr/share/bootstrap/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
+          $SSH 'sudo /usr/share/bootstrap/11-luks-fido2.sh --check' 2>&1 | grep -i 'skip\|no yubikey\|not luks\|n/a'
+          $SSH 'sudo /usr/share/bootstrap/05-firmware-update.sh --check' 2>&1 | grep -i 'skip\|vm'
+
+          echo "run-all.sh --check terminates 0"
+          $SSH 'sudo /usr/share/bootstrap/run-all.sh --check'
+
+          echo "e2e VM test passed"
+
+      - name: Shutdown VM
+        if: always()
+        run: |
+          ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -p 2222 netf@localhost 'sudo systemctl poweroff' || true
+          sleep 5
+          [[ -f qemu.pid ]] && kill -9 "$(cat qemu.pid)" 2>/dev/null || true
+
+      - name: Upload VM serial log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vm-serial-log
+          path: vm-serial.log
+          retention-days: 7
