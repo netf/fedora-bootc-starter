@@ -29,7 +29,7 @@ test_build_workflow() {
     assert_file_contains "$path" "lint:"
     assert_file_contains "$path" "build:"
     assert_file_contains "$path" "e2e-vm:"
-    assert_file_contains "$path" "uses: hadolint/hadolint-action@v3"
+    assert_file_contains "$path" "uses: hadolint/hadolint-action@v3.3.0"
     assert_file_contains "$path" "uses: sigstore/cosign-installer@v3"
     assert_file_contains "$path" "config-ci-rendered.toml"
     assert_file_contains "$path" "uses: actions/upload-artifact@v4"
