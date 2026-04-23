@@ -141,11 +141,79 @@ test_luks_fido2_script() {
     assert_file_contains "$path" "marker_write \"11-fido2\""
 }
 
-test_netf_bootstrap_service
-test_common_library
-test_sanity_script
-test_firmware_update_script
-test_luks_tpm2_script
-test_luks_fido2_script
+test_luks_recovery_script() {
+    local path="$REPO_ROOT/bootstrap/12-luks-recovery.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! has_encrypted_root; then"
+    assert_file_contains "$path" "skip \"root is not LUKS-encrypted - recovery key N/A\""
+    assert_file_contains "$path" "DEV=\$(luks_device)"
+    assert_file_contains "$path" "if has_token \"\$DEV\" \"systemd-recovery\"; then"
+    assert_file_contains "$path" "warn \"Recovery key NOT enrolled\""
+    assert_file_contains "$path" "systemd-cryptenroll \"\$DEV\" --recovery-key"
+    assert_file_contains "$path" "read -rp \"Type 'saved' to confirm you wrote it down: \" ans"
+    assert_file_contains "$path" "[[ \"\$ans\" == \"saved\" ]] || err \"not confirmed - re-run to re-display\""
+    assert_file_contains "$path" "marker_write \"12-recovery\""
+}
+
+test_luks_wipe_installer_script() {
+    local path="$REPO_ROOT/bootstrap/13-luks-wipe-installer.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! has_encrypted_root; then"
+    assert_file_contains "$path" "skip \"root is not LUKS-encrypted - nothing to wipe\""
+    assert_file_contains "$path" "DUMP=\$(cryptsetup luksDump \"\$DEV\")"
+    assert_file_contains "$path" "grep -qE '^\\s*0:\\s+luks2' <<<\"\$DUMP\""
+    assert_file_contains "$path" "grep -q \"systemd-tpm2\"     <<<\"\$DUMP\" || err \"Refusing: TPM2 not enrolled\""
+    assert_file_contains "$path" "grep -q \"systemd-fido2\"    <<<\"\$DUMP\" || err \"Refusing: FIDO2 not enrolled\""
+    assert_file_contains "$path" "grep -q \"systemd-recovery\" <<<\"\$DUMP\" || err \"Refusing: recovery key not enrolled\""
+    assert_file_contains "$path" "cryptsetup luksKillSlot \"\$DEV\" 0"
+    assert_file_contains "$path" "marker_write \"13-wipe\""
+}
+
+test_fingerprint_enroll_script() {
+    local path="$REPO_ROOT/bootstrap/30-fingerprint-enroll.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! has_fingerprint_reader; then"
+    assert_file_contains "$path" "skip \"no fingerprint reader detected - skipping\""
+    assert_file_contains "$path" "USER_NAME=\"\${SUDO_USER:-netf}\""
+    assert_file_contains "$path" "sudo -u \"\$USER_NAME\" fprintd-list \"\$USER_NAME\" 2>/dev/null \\"
+    assert_file_contains "$path" "grep -q \"right-index-finger\\|left-index-finger\""
+    assert_file_contains "$path" "warn \"No fingerprint enrolled\""
+    assert_file_contains "$path" "sudo -u \"\$USER_NAME\" fprintd-enroll -f right-index-finger \"\$USER_NAME\""
+    assert_file_contains "$path" "marker_write \"30-fprint\""
+}
+
+run_tests() {
+    local tests=("$@")
+    local test_name
+
+    if [[ ${#tests[@]} -eq 0 ]]; then
+        tests=(
+            test_netf_bootstrap_service
+            test_common_library
+            test_sanity_script
+            test_firmware_update_script
+            test_luks_tpm2_script
+            test_luks_fido2_script
+            test_luks_recovery_script
+            test_luks_wipe_installer_script
+            test_fingerprint_enroll_script
+        )
+    fi
+
+    for test_name in "${tests[@]}"; do
+        declare -F "$test_name" >/dev/null || fail "unknown test: $test_name"
+        "$test_name"
+    done
+}
+
+run_tests "$@"
 
 echo "PASS: bootstrap-scaffold"
