@@ -5,7 +5,7 @@
       "ghcr.io/netf": [
         {
           "type": "sigstoreSigned",
-          "keyPath": "/usr/etc/containers/pubkey.pem",
+          "keyPath": "/etc/containers/pubkey.pem",
           "signedIdentity": {"type": "matchRepository"}
         }
       ],

@@ -19,6 +19,12 @@ assert_file_matches() {
     [[ "$actual" == "$expected" ]] || fail "unexpected contents in $path"
 }
 
+assert_file_missing() {
+    local path="$1"
+
+    [[ ! -e "$path" ]] || fail "expected path to be absent: $path"
+}
+
 test_motd() {
     local expected
     expected="$(cat <<'EOF'
@@ -32,17 +38,19 @@ Or:
 EOF
 )"
 
-    assert_file_matches "$REPO_ROOT/files/usr/etc/motd" "$expected"
+    assert_file_matches "$REPO_ROOT/files/etc/motd" "$expected"
+    assert_file_missing "$REPO_ROOT/files/usr/etc/motd"
 }
 
 test_containers_policy() {
-    local path="$REPO_ROOT/files/usr/etc/containers/policy.json"
+    local path="$REPO_ROOT/files/etc/containers/policy.json"
 
     [[ -f "$path" ]] || fail "missing file: $path"
 
     local compact
     compact="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), separators=(",", ":")))' "$path")"
-    [[ "$compact" == '{"default":[{"type":"insecureAcceptAnything"}],"transports":{"docker":{"ghcr.io/netf":[{"type":"sigstoreSigned","keyPath":"/usr/etc/containers/pubkey.pem","signedIdentity":{"type":"matchRepository"}}],"quay.io/fedora-ostree-desktops":[{"type":"insecureAcceptAnything"}],"quay.io/centos-bootc":[{"type":"insecureAcceptAnything"}]}}}' ]] || fail "unexpected contents in $path"
+    [[ "$compact" == '{"default":[{"type":"insecureAcceptAnything"}],"transports":{"docker":{"ghcr.io/netf":[{"type":"sigstoreSigned","keyPath":"/etc/containers/pubkey.pem","signedIdentity":{"type":"matchRepository"}}],"quay.io/fedora-ostree-desktops":[{"type":"insecureAcceptAnything"}],"quay.io/centos-bootc":[{"type":"insecureAcceptAnything"}]}}}' ]] || fail "unexpected contents in $path"
+    assert_file_missing "$REPO_ROOT/files/usr/etc/containers/policy.json"
 }
 
 test_registries_config() {
@@ -54,7 +62,8 @@ docker:
 EOF
 )"
 
-    assert_file_matches "$REPO_ROOT/files/usr/etc/containers/registries.d/ghcr-io-netf.yaml" "$expected"
+    assert_file_matches "$REPO_ROOT/files/etc/containers/registries.d/ghcr-io-netf.yaml" "$expected"
+    assert_file_missing "$REPO_ROOT/files/usr/etc/containers/registries.d/ghcr-io-netf.yaml"
 }
 
 test_motd

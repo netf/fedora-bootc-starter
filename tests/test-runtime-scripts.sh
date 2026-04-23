@@ -43,7 +43,7 @@ test_verify_image_script() {
     assert_file_contains "$path" "podman pull --quiet \"\$IMAGE_REF\" > /dev/null"
     assert_file_contains "$path" "podman run --rm \"\$IMAGE_REF\" bash -c '"
     assert_file_contains "$path" "test -x /usr/share/bootstrap/run-all.sh"
-    assert_file_contains "$path" "test -f /usr/etc/containers/pubkey.pem"
+    assert_file_contains "$path" "test -f /etc/containers/pubkey.pem"
     assert_file_contains "$path" "command -v chezmoi mise alacritty distrobox tailscale framework_tool >/dev/null"
 }
 

@@ -46,6 +46,9 @@ test_build_workflow() {
     assert_file_contains "$path" "uses: actions/upload-artifact@v4"
     assert_file_contains "$path" "sbverify"
     assert_file_not_contains "$path" "sbctl"
+    assert_file_contains "$path" "files/etc/containers/registries.d/"
+    assert_file_contains "$path" "/etc/containers/policy.json"
+    assert_file_not_contains "$path" "/usr/etc"
 }
 
 run_tests() {

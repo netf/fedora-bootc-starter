@@ -23,8 +23,8 @@ podman run --rm "$IMAGE_REF" bash -c '
     set -e
     test -x /usr/share/bootstrap/run-all.sh
     test -f /usr/lib/bootc/kargs.d/10-fw13.toml
-    test -f /usr/etc/containers/policy.json
-    test -f /usr/etc/containers/pubkey.pem
+    test -f /etc/containers/policy.json
+    test -f /etc/containers/pubkey.pem
     command -v chezmoi mise alacritty distrobox tailscale framework_tool >/dev/null
     echo "  image content OK"
 '

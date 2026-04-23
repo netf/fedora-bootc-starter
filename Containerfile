@@ -41,15 +41,15 @@ RUN rpm-ostree install \
 
 # framework_tool from stage 1
 COPY --from=fw-tool-builder /src/target/release/framework_tool /usr/local/bin/framework_tool
-# System config: /usr/etc/* is copied to /etc/ on deploy with 3-way merge.
-# systemd unit: /usr/lib/systemd/system/* is package-owned (correct location).
-COPY files/usr/ /usr/
+# System config: /etc is supported for bootc image-owned config and receives
+# OSTree 3-way merge semantics on upgrade. Systemd units stay in /usr/lib.
+COPY files/ /
 
 # Bootstrap scripts
 COPY bootstrap/ /usr/share/bootstrap/
 
 # Embed cosign public key for signature enforcement
-COPY cosign.pub /usr/etc/containers/pubkey.pem
+COPY cosign.pub /etc/containers/pubkey.pem
 
 # Build-time setup and validation:
 # - install mise
@@ -62,8 +62,8 @@ RUN chmod +x /usr/local/bin/framework_tool \
  && curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
  && ostree container commit \
  && chmod +x /usr/share/bootstrap/*.sh /usr/share/bootstrap/lib/*.sh \
- && grep -q "/usr/etc/containers/pubkey.pem" /usr/etc/containers/policy.json \
- && test -f /usr/etc/containers/pubkey.pem \
+ && grep -q "/etc/containers/pubkey.pem" /etc/containers/policy.json \
+ && test -f /etc/containers/pubkey.pem \
  && echo "signature policy wired correctly" \
  && printf 'add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd "\n' \
       > /usr/lib/dracut/dracut.conf.d/50-luks-unlock.conf \

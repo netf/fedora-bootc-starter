@@ -40,7 +40,7 @@ jobs:
       - name: yamllint
         run: |
           sudo apt-get install -y yamllint
-          yamllint .github/workflows/ files/usr/etc/containers/registries.d/
+          yamllint .github/workflows/ files/etc/containers/registries.d/
 
       - name: TOML parse
         run: |
@@ -107,10 +107,10 @@ jobs:
 
             systemctl is-enabled netf-bootstrap.service
 
-            test -f /usr/etc/containers/policy.json
-            test -f /usr/etc/containers/pubkey.pem
-            grep -q /usr/etc/containers/pubkey.pem /usr/etc/containers/policy.json
-            test -f /usr/etc/containers/registries.d/ghcr-io-netf.yaml
+            test -f /etc/containers/policy.json
+            test -f /etc/containers/pubkey.pem
+            grep -q /etc/containers/pubkey.pem /etc/containers/policy.json
+            test -f /etc/containers/registries.d/ghcr-io-netf.yaml
 
             command -v chezmoi mise alacritty distrobox tailscale tpm2_pcrread \
                        ykman fido2-token fwupdmgr framework_tool fprintd-enroll \
