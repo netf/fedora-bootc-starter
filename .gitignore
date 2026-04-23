@@ -1,0 +1,26 @@
+# cosign private material — NEVER commit
+cosign.key
+cosign.password
+
+# CI keypair (regenerated per run)
+ci-key
+ci-key.pub
+
+# bootc-image-builder output
+output/
+*.qcow2
+*.iso
+
+# local build artefacts
+*.tar
+*.tar.zst
+
+# editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# python cache that tooling may produce
+__pycache__/
+*.pyc
