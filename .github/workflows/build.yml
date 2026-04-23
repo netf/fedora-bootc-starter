@@ -234,7 +234,7 @@ jobs:
               -v $PWD/output:/output \
               quay.io/centos-bootc/bootc-image-builder:latest \
               --progress verbose \
-              --type qcow2 --rootfs ext4 --config /config.toml \
+              --type qcow2 --rootfs btrfs --config /config.toml \
               localhost/test-image:ci
           sudo chown -R "$USER" output
           ls -lh output/qcow2/

@@ -50,7 +50,7 @@ test_config_ci_toml() {
     assert_file_contains "$path" "name = \"root\""
     assert_file_contains "$path" "key = \"{{CI_PUBKEY}}\""
     assert_file_contains "$path" "[customizations.kernel]"
-    assert_file_contains "$path" "append = \"console=ttyS0,115200\""
+    assert_file_contains "$path" "append = \"console=ttyS0,115200 rd.debug systemd.log_level=debug systemd.log_target=console\""
 }
 
 run_tests() {
