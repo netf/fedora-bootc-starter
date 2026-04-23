@@ -117,6 +117,7 @@ jobs:
             test -f /usr/lib/bootc/kargs.d/10-fw13.toml
             grep -q intel_iommu /usr/lib/bootc/kargs.d/10-fw13.toml
 
+            systemctl is-enabled sshd.service
             systemctl is-enabled netf-bootstrap.service
 
             test -f /etc/containers/policy.json
@@ -125,7 +126,7 @@ jobs:
             test -f /etc/containers/registries.d/ghcr-io-netf.yaml
 
             command -v chezmoi mise alacritty distrobox tailscale tpm2_pcrread \
-                       ykman fido2-token fwupdmgr framework_tool fprintd-enroll \
+                       ykman fido2-token fwupdmgr framework_tool fprintd-enroll sshd \
                        sbverify restic bpftool bpftrace kdeconnectd iio-sensor-proxy
 
             ! command -v eza

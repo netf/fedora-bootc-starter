@@ -26,6 +26,7 @@ RUN rpm-ostree install \
       git-core \
       chezmoi \
       alacritty \
+      openssh-server \
       podman-compose distrobox \
       tailscale wireguard-tools \
       tpm2-tools yubikey-manager fido2-tools \
@@ -73,5 +74,6 @@ RUN chmod +x /usr/local/bin/framework_tool \
  && mkdir -p /usr/lib/bootc/kargs.d \
  && printf 'kargs = [\n  "intel_iommu=on",\n  "rd.luks.options=discard",\n  "mem_sleep_default=s2idle",\n  "quiet",\n  "splash",\n]\n' \
       > /usr/lib/bootc/kargs.d/10-fw13.toml \
+ && systemctl enable sshd.service \
  && systemctl enable netf-bootstrap.service \
  && bootc container lint

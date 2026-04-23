@@ -42,12 +42,14 @@ test_containerfile() {
     assert_file_contains "$path" "COPY files/ /"
     assert_file_contains "$path" "COPY bootstrap/ /usr/share/bootstrap/"
     assert_file_contains "$path" "COPY cosign.pub /etc/containers/pubkey.pem"
+    assert_file_contains "$path" "openssh-server"
     assert_file_contains "$path" "sbsigntools"
     assert_file_not_contains "$path" "sbctl"
     assert_file_not_contains "$path" "/usr/etc"
     assert_file_contains "$path" "dracut.conf.d/50-luks-unlock.conf"
     assert_file_contains "$path" "add_dracutmodules+=\" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree \""
     assert_file_contains "$path" "/usr/lib/bootc/kargs.d/10-fw13.toml"
+    assert_file_contains "$path" "systemctl enable sshd.service"
     assert_file_contains "$path" "bootc container lint"
 }
 
