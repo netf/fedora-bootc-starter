@@ -206,6 +206,23 @@ test_framework_ec_script() {
     assert_file_contains "$path" "marker_write \"40-ec\""
 }
 
+test_run_all_script() {
+    local path="$REPO_ROOT/bootstrap/run-all.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "cd /usr/share/bootstrap"
+    assert_file_contains "$path" "mapfile -t STEPS < <(find . -maxdepth 1 -name '[0-9]*.sh' -type f | sort)"
+    assert_file_contains "$path" "if [[ \${#STEPS[@]} -eq 0 ]]; then"
+    assert_file_contains "$path" "FAILED=0"
+    assert_file_contains "$path" "for step in \"\${STEPS[@]}\"; do"
+    assert_file_contains "$path" "if [[ \$CHECK -eq 1 ]]; then"
+    assert_file_contains "$path" "if ! \"\$step\" --check; then"
+    assert_file_contains "$path" "marker_write \"all\""
+    assert_file_contains "$path" "ok \"Bootstrap complete. Reboot recommended.\""
+}
+
 run_tests() {
     local tests=("$@")
     local test_name
@@ -222,6 +239,7 @@ run_tests() {
             test_luks_wipe_installer_script
             test_fingerprint_enroll_script
             test_framework_ec_script
+            test_run_all_script
         )
     fi
 
