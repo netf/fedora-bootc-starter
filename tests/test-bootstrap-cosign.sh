@@ -96,8 +96,29 @@ EOF
     assert_contains "$RUN_OUTPUT" "COSIGN_PASSWORD"
 }
 
+test_allows_cosign_to_prompt_for_password() {
+    local workdir="$TMP_ROOT/prompt-password"
+    local bindir="$workdir/bin"
+    mkdir -p "$workdir"
+    make_stub_cosign "$bindir" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n "${COSIGN_PASSWORD+x}" ]]; then
+    echo "COSIGN_PASSWORD should not be preset" >&2
+    exit 1
+fi
+printf "%s\n" "PUBLIC KEY DATA" > cosign.pub
+printf "%s\n" "PRIVATE KEY DATA" > cosign.key
+EOF
+
+    run_script "$workdir" env PATH="$bindir:/usr/bin:/bin" "$SCRIPT"
+
+    [[ $RUN_STATUS -eq 0 ]] || fail "expected cosign to manage password prompting itself"
+}
+
 test_fails_when_cosign_is_missing
 test_refuses_to_overwrite_existing_key
 test_generates_keypair_and_prints_next_steps
+test_allows_cosign_to_prompt_for_password
 
 echo "PASS: bootstrap-cosign"

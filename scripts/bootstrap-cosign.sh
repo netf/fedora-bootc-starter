@@ -24,7 +24,7 @@ echo "→ Generating cosign keypair. You will be prompted for a password."
 echo "  Choose a strong password; store it in your password manager."
 echo ""
 
-COSIGN_PASSWORD="" cosign generate-key-pair
+cosign generate-key-pair
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
