@@ -1,0 +1,7 @@
+┌─────────────────────────────────────────────────────────────┐
+│  System bootstrap complete. To apply dotfiles:              │
+│                                                             │
+│    curl -fsLS https://raw.githubusercontent.com/netf/dotfiles/main/install.sh | bash
+│                                                             │
+│  Or: chezmoi init --apply netf                              │
+└─────────────────────────────────────────────────────────────┘
