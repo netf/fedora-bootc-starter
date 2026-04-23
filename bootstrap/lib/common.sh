@@ -62,3 +62,8 @@ has_token() {
 # Marker files for per-step idempotency.
 marker_done()  { [[ -f "/var/lib/bootstrap/.${1}.done" ]]; }
 marker_write() { mkdir -p /var/lib/bootstrap && touch "/var/lib/bootstrap/.${1}.done"; }
+
+# Marker files for boot-critical changes that require initramfs regeneration.
+boot_artifacts_dirty() { [[ -f /var/lib/bootstrap/.boot-artifacts-dirty ]]; }
+mark_boot_artifacts_dirty() { mkdir -p /var/lib/bootstrap && touch /var/lib/bootstrap/.boot-artifacts-dirty; }
+clear_boot_artifacts_dirty() { rm -f /var/lib/bootstrap/.boot-artifacts-dirty; }

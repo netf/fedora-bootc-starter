@@ -36,10 +36,12 @@ fi
 
 log "Enrolling TPM2 on $DEV (PCRs 7+11). Prompts for current LUKS passphrase."
 systemd-cryptenroll "$DEV" --tpm2-device=auto --tpm2-pcrs=7+11
+mark_boot_artifacts_dirty
 
 if ! grep -qE "^${MAPPER}.*tpm2-device=auto" /etc/crypttab; then
     log "Patching /etc/crypttab for TPM2 auto-unlock"
     sed -ri "s|^(${MAPPER}\s+\S+\s+\S+)(\s+.*)?$|\1 tpm2-device=auto|" /etc/crypttab
+    mark_boot_artifacts_dirty
 fi
 
 ok "TPM2 enrolled"

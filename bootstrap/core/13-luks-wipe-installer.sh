@@ -38,5 +38,6 @@ read -rp "Type YES to proceed: " ans
 [[ "$ans" == "YES" ]] || err "aborted"
 
 cryptsetup luksKillSlot "$DEV" 0
+mark_boot_artifacts_dirty
 ok "Installer passphrase wiped. Unlock is now TPM2 (auto) / recovery key, plus any optional extra tokens."
 marker_write "13-wipe"
