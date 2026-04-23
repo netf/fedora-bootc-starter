@@ -190,6 +190,22 @@ test_fingerprint_enroll_script() {
     assert_file_contains "$path" "marker_write \"30-fprint\""
 }
 
+test_framework_ec_script() {
+    local path="$REPO_ROOT/bootstrap/40-framework-ec.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! is_framework_laptop; then"
+    assert_file_contains "$path" "skip \"not a Framework laptop - skipping EC config\""
+    assert_file_contains "$path" "if ! command -v framework_tool >/dev/null 2>&1; then"
+    assert_file_contains "$path" "CHARGE_LIMIT=80"
+    assert_file_contains "$path" "CURRENT=\$(framework_tool --charge-limit 2>/dev/null \\"
+    assert_file_contains "$path" "if [[ \"\$CURRENT\" == \"\$CHARGE_LIMIT\" ]]; then"
+    assert_file_contains "$path" "framework_tool --charge-limit \"\$CHARGE_LIMIT\""
+    assert_file_contains "$path" "marker_write \"40-ec\""
+}
+
 run_tests() {
     local tests=("$@")
     local test_name
@@ -205,6 +221,7 @@ run_tests() {
             test_luks_recovery_script
             test_luks_wipe_installer_script
             test_fingerprint_enroll_script
+            test_framework_ec_script
         )
     fi
 
