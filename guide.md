@@ -1108,32 +1108,33 @@ jobs:
 
       - name: Verify system state in VM
         run: |
-          SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 netf@localhost"
+          USER_SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 netf@localhost"
+          ROOT_SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 root@localhost"
 
           echo "─── Basic system ───"
-          $SSH 'cat /etc/os-release | grep VERSION'
-          $SSH 'bootc status'
-          $SSH 'systemctl is-system-running || true'   # may report degraded, that's OK
+          $USER_SSH 'cat /etc/os-release | grep VERSION'
+          $ROOT_SSH 'bootc status'
+          $ROOT_SSH 'systemctl is-system-running || true'   # may report degraded, that's OK
 
           echo "─── Image-baked tooling ───"
-          $SSH 'command -v chezmoi mise starship alacritty framework_tool'
-          $SSH 'command -v tpm2_pcrread ykman fwupdmgr'
+          $ROOT_SSH 'command -v chezmoi mise starship alacritty framework_tool'
+          $ROOT_SSH 'command -v tpm2_pcrread ykman fwupdmgr'
 
           echo "─── TPM2 visible (via swtpm) ───"
-          $SSH 'sudo tpm2_pcrread sha256:7,11'
+          $ROOT_SSH 'tpm2_pcrread sha256:7,11'
 
           echo "─── Hardware-gated scripts skip gracefully ───"
           # Framework EC: should skip (VM is not Framework)
-          $SSH 'sudo /usr/share/bootstrap/40-framework-ec.sh --check 2>&1' | grep -i 'skip\|not a framework'
+          $ROOT_SSH '/usr/share/bootstrap/40-framework-ec.sh --check 2>&1' | grep -i 'skip\|not a framework'
           # Fingerprint: should skip (no Goodix device)
-          $SSH 'sudo /usr/share/bootstrap/30-fingerprint-enroll.sh --check 2>&1' | grep -i 'skip\|no fingerprint'
+          $ROOT_SSH '/usr/share/bootstrap/30-fingerprint-enroll.sh --check 2>&1' | grep -i 'skip\|no fingerprint'
           # FIDO2: should skip (no YubiKey)
-          $SSH 'sudo /usr/share/bootstrap/11-luks-fido2.sh --check 2>&1' | grep -i 'skip\|no yubikey\|not luks'
+          $ROOT_SSH '/usr/share/bootstrap/11-luks-fido2.sh --check 2>&1' | grep -i 'skip\|no yubikey\|not luks'
           # Firmware: should skip in VM
-          $SSH 'sudo /usr/share/bootstrap/05-firmware-update.sh --check 2>&1' | grep -i 'skip\|vm'
+          $ROOT_SSH '/usr/share/bootstrap/05-firmware-update.sh --check 2>&1' | grep -i 'skip\|vm'
 
           echo "─── run-all.sh --check terminates cleanly ───"
-          $SSH 'sudo /usr/share/bootstrap/run-all.sh --check; echo "exit: $?"'
+          $ROOT_SSH '/usr/share/bootstrap/run-all.sh --check; echo "exit: $?"'
 
           echo "✓ e2e VM test passed"
 
@@ -1141,7 +1142,7 @@ jobs:
         if: always()
         run: |
           ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -p 2222 netf@localhost 'sudo systemctl poweroff' || true
+              -p 2222 root@localhost 'systemctl poweroff' || true
           sleep 5
           [[ -f qemu.pid ]] && kill -9 $(cat qemu.pid) 2>/dev/null || true
 

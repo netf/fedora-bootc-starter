@@ -306,31 +306,32 @@ jobs:
 
       - name: Verify system state in VM
         run: |
-          SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 netf@localhost"
+          USER_SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 netf@localhost"
+          ROOT_SSH="ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2222 root@localhost"
 
           echo "Basic system"
-          $SSH 'cat /etc/os-release | grep VERSION'
-          $SSH 'bootc status'
-          $SSH 'systemctl is-system-running || true'
+          $USER_SSH 'cat /etc/os-release | grep VERSION'
+          $ROOT_SSH 'bootc status'
+          $ROOT_SSH 'systemctl is-system-running || true'
 
           echo "Image-baked tooling"
-          $SSH 'command -v chezmoi mise alacritty framework_tool'
-          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbverify'
+          $ROOT_SSH 'command -v chezmoi mise alacritty framework_tool'
+          $ROOT_SSH 'command -v tpm2_pcrread ykman fwupdmgr sbverify'
 
           echo "TPM2 visible via swtpm"
-          $SSH 'sudo tpm2_pcrread sha256:7,11'
+          $ROOT_SSH 'tpm2_pcrread sha256:7,11'
 
           echo "sbverify available"
-          $SSH 'sbverify --help >/dev/null'
+          $ROOT_SSH 'sbverify --help >/dev/null'
 
           echo "Hardware-gated scripts skip gracefully"
-          $SSH 'sudo /usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
-          $SSH 'sudo /usr/share/bootstrap/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
-          $SSH 'sudo /usr/share/bootstrap/11-luks-fido2.sh --check' 2>&1 | grep -i 'skip\|no yubikey\|not luks\|n/a'
-          $SSH 'sudo /usr/share/bootstrap/05-firmware-update.sh --check' 2>&1 | grep -i 'skip\|vm'
+          $ROOT_SSH '/usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
+          $ROOT_SSH '/usr/share/bootstrap/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
+          $ROOT_SSH '/usr/share/bootstrap/11-luks-fido2.sh --check' 2>&1 | grep -i 'skip\|no yubikey\|not luks\|n/a'
+          $ROOT_SSH '/usr/share/bootstrap/05-firmware-update.sh --check' 2>&1 | grep -i 'skip\|vm'
 
           echo "run-all.sh --check terminates 0"
-          $SSH 'sudo /usr/share/bootstrap/run-all.sh --check'
+          $ROOT_SSH '/usr/share/bootstrap/run-all.sh --check'
 
           echo "e2e VM test passed"
 
@@ -338,7 +339,7 @@ jobs:
         if: always()
         run: |
           ssh -i ci-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -p 2222 netf@localhost 'sudo systemctl poweroff' || true
+              -p 2222 root@localhost 'systemctl poweroff' || true
           sleep 5
           [[ -f qemu.pid ]] && kill -9 "$(cat qemu.pid)" 2>/dev/null || true
 
