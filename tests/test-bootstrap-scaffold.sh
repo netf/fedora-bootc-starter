@@ -88,8 +88,25 @@ test_sanity_script() {
     assert_file_contains "$path" "marker_write \"00-sanity\""
 }
 
+test_firmware_update_script() {
+    local path="$REPO_ROOT/bootstrap/05-firmware-update.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if is_vm; then"
+    assert_file_contains "$path" "skip \"running in a VM - no real firmware to update\""
+    assert_file_contains "$path" "fwupdmgr refresh --force >/dev/null 2>&1 || warn \"fwupd refresh failed (no network?)\""
+    assert_file_contains "$path" "PENDING=\$(fwupdmgr get-updates 2>/dev/null"
+    assert_file_contains "$path" "if [[ \$PENDING -eq 0 ]]; then"
+    assert_file_contains "$path" "if [[ \$CHECK -eq 1 ]]; then"
+    assert_file_contains "$path" "fwupdmgr update -y --no-reboot-check || warn \"some updates deferred to next boot\""
+    assert_file_contains "$path" "marker_write \"05-firmware\""
+}
+
 test_netf_bootstrap_service
 test_common_library
 test_sanity_script
+test_firmware_update_script
 
 echo "PASS: bootstrap-scaffold"
