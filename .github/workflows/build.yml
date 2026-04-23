@@ -51,7 +51,14 @@ jobs:
 
       - name: TOML parse
         run: |
-          python3 -c "import tomllib; tomllib.load(open('config.toml','rb'))"
+          RENDERED_CONFIG="$(mktemp)"
+          INSTALL_LUKS_PASSPHRASE="fixture-passphrase" \
+          ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
+          EXTRA_USER_BLOCKS="" \
+          EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+            ./scripts/render-installer-config.sh > "$RENDERED_CONFIG"
+          python3 -c "import tomllib; tomllib.load(open('$RENDERED_CONFIG','rb'))"
+          rm -f "$RENDERED_CONFIG"
           python3 -c "import tomllib; tomllib.load(open('config-ci.toml','rb'))"
 
   build:

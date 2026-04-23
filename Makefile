@@ -3,6 +3,10 @@ FW_TOOL_VERSION ?= v0.4.0
 IMAGE_REF      ?= ghcr.io/netf/fedora-bootc-starter:$(FEDORA_VERSION)
 BUILDER_IMG    := quay.io/centos-bootc/bootc-image-builder:latest
 OUTPUT_DIR     := output
+export INSTALL_LUKS_PASSPHRASE ?=
+export ADMIN_PASSWORD_HASH ?= $$6$$YdvxSXl6YUHhOzEf$$YTvt9PEWKWpTVcb.Y4N/Qlwp.cpMmQbegc8OIFsturFPjOtuYWw4Uzwy5dHlwNiqqiaMd9mfUlJH6wn.EA1Wo0
+export EXTRA_USER_BLOCKS ?=
+export EXTRA_KERNEL_APPEND ?=
 
 .DEFAULT_GOAL := help
 .PHONY: help lint build inspect push sign iso usb test-vm clean
@@ -45,6 +49,7 @@ sign:  ## cosign sign the pushed image DIGEST (not tag)
 
 iso: build  ## Build the unattended installer ISO
 	mkdir -p $(OUTPUT_DIR)
+	@test -n "$$INSTALL_LUKS_PASSPHRASE" || { echo "ERROR: INSTALL_LUKS_PASSPHRASE is required"; exit 1; }
 	RENDERED_CONFIG=$$(mktemp "$(PWD)/$(OUTPUT_DIR)/installer-config.XXXXXX.toml"); \
 	trap 'rm -f "$$RENDERED_CONFIG"' EXIT; \
 	./scripts/render-installer-config.sh > "$$RENDERED_CONFIG"; \

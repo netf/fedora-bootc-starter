@@ -48,6 +48,8 @@ test_build_workflow() {
     assert_file_contains "$path" "uses: hadolint/hadolint-action@v3.3.0"
     assert_file_contains "$path" "uses: sigstore/cosign-installer@v3"
     assert_file_contains "$path" "config-ci-rendered.toml"
+    assert_file_contains "$path" 'RENDERED_CONFIG="$(mktemp)"'
+    assert_file_contains "$path" './scripts/render-installer-config.sh > "$RENDERED_CONFIG"'
     assert_file_contains "$path" "uses: actions/upload-artifact@v4"
     assert_file_contains "$path" "podman login --compat-auth-file \"\$HOME/.docker/config.json\""
     assert_file_contains "$path" "--progress verbose"
@@ -77,6 +79,7 @@ test_build_workflow() {
     assert_file_contains "$path" "sbverify"
     assert_file_not_contains "$path" "sbctl"
     assert_file_not_contains "$path" "netf@localhost 'sudo systemctl poweroff' || true"
+    assert_file_not_contains "$path" "tomllib.load(open('config.toml','rb'))"
     assert_file_contains "$path" "files/etc/containers/registries.d/"
     assert_file_contains "$path" "/etc/containers/policy.json"
     assert_file_not_contains "$path" "/usr/etc"

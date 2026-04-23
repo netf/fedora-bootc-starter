@@ -201,9 +201,9 @@ Use glob `[0-9]*.sh` rather than `0*.sh 1*.sh 3*.sh 4*.sh` — picks up any futu
 
 ## 8. Installer (kickstart)
 
-### 8.1 `config.toml` — user-facing unattended install
+### 8.1 `config.toml.in` — authoritative unattended-install template
 
-Consumed by `bootc-image-builder --type anaconda-iso`. Produces an ISO with the image embedded (no network required during install). Highlights:
+Rendered to a real `config.toml` before invoking `bootc-image-builder --type anaconda-iso`. Produces an ISO with the image embedded (no network required during install). Highlights:
 
 - Partitioning: `zerombr`, GPT, `reqpart --add-boot`, single btrfs root on LUKS2/argon2id.
 - Locale: `en_GB.UTF-8`, PL keyboard, Europe/Warsaw, UTC.
@@ -266,7 +266,7 @@ User runs `bootc switch --enforce-container-sigpolicy <ref>` for major version j
 - `shellcheck -x bootstrap/**/*.sh scripts/*.sh`
 - `bash -n` on every shell script (parse check)
 - `yamllint .github/workflows/ *.yaml *.yml` (relaxed line length)
-- TOML parse (`taplo lint config.toml config-ci.toml`)
+- TOML parse on rendered `config.toml.in` output plus `config-ci.toml`
 
 Gate for `build` and `e2e-vm`.
 
@@ -334,7 +334,7 @@ fedora-bootc-starter/
 ├── Containerfile
 ├── Makefile
 ├── README.md
-├── config.toml
+├── config.toml.in
 ├── config-ci.toml
 ├── cosign.pub
 ├── guide.md                          # kept as reference

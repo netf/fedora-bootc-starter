@@ -19,7 +19,9 @@ TEMPLATE_PATH="$TEMPLATE_PATH" python3 - <<'PY'
 import json
 import os
 import pathlib
+import re
 import sys
+import tomllib
 
 template_path = pathlib.Path(os.environ["TEMPLATE_PATH"])
 rendered = template_path.read_text()
@@ -33,14 +35,16 @@ def fail(message: str) -> None:
 def validate_passphrase(value: str) -> str:
     if not value:
         fail("INSTALL_LUKS_PASSPHRASE must not be empty")
-    if any(ch.isspace() for ch in value) or any(ord(ch) < 0x20 for ch in value):
-        fail("unsafe INSTALL_LUKS_PASSPHRASE: must not contain whitespace or control characters")
+    if not re.fullmatch(r"[A-Za-z0-9._%+=,:@/-]+", value):
+        fail(
+            "unsafe INSTALL_LUKS_PASSPHRASE: only [A-Za-z0-9._%+=,:@/-] are allowed"
+        )
     return value
 
 
 def escape_toml_basic_string(value: str) -> str:
-    if "\x00" in value:
-        fail("EXTRA_KERNEL_APPEND must not contain NUL bytes")
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+        fail("EXTRA_KERNEL_APPEND must not contain control characters")
     return json.dumps(value)[1:-1]
 
 replacements = {
@@ -53,8 +57,17 @@ replacements = {
 for needle, replacement in replacements.items():
     rendered = rendered.replace(needle, replacement)
 
-if "{{" in rendered or "}}" in rendered:
-    raise SystemExit("ERROR: unresolved template placeholders remain")
+leftover_placeholder = re.search(r"{{[^{}]+}}", rendered)
+if leftover_placeholder:
+    fail(
+        "unresolved template placeholders remain: "
+        f"{leftover_placeholder.group(0)}"
+    )
+
+try:
+    tomllib.loads(rendered)
+except tomllib.TOMLDecodeError as exc:
+    fail(f"rendered TOML is invalid: {exc}")
 
 sys.stdout.write(rendered)
 PY

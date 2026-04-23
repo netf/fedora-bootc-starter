@@ -8,6 +8,12 @@ fail() {
     exit 1
 }
 
+assert_file_not_exists() {
+    local path="$1"
+
+    [[ ! -e "$path" ]] || fail "expected file to not exist: $path"
+}
+
 assert_file_contains() {
     local path="$1"
     local needle="$2"
@@ -47,6 +53,18 @@ assert_command_fails_contains() {
     fi
 
     [[ "$output" == *"$needle"* ]] || fail "expected command failure to contain: $needle"
+}
+
+assert_command_succeeds_contains() {
+    local needle="$1"
+    shift
+
+    local output
+    if ! output="$("$@" 2>&1)"; then
+        fail "expected command to succeed: $*"
+    fi
+
+    [[ "$output" == *"$needle"* ]] || fail "expected command output to contain: $needle"
 }
 
 assert_kernel_append_equals() {
@@ -98,17 +116,6 @@ output_path.write_text(rendered)
 PY
 }
 
-test_config_toml() {
-    local path="$REPO_ROOT/config.toml"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-    assert_toml_parses "$path"
-    assert_file_contains "$path" "[customizations.installer.kickstart]"
-    assert_file_contains "$path" "The authoritative source is config.toml.in."
-    assert_file_contains "$path" "[customizations.kernel]"
-    assert_file_not_contains "$path" "installer-temp-change-me"
-}
-
 test_config_ci_toml() {
     local path="$REPO_ROOT/config-ci.toml"
 
@@ -126,6 +133,7 @@ test_config_toml_template() {
     local path="$REPO_ROOT/config.toml.in"
     local rendered_path
 
+    assert_file_not_exists "$REPO_ROOT/config.toml"
     [[ -f "$path" ]] || fail "missing file: $path"
     assert_file_contains "$path" "{{INSTALL_LUKS_PASSPHRASE}}"
     assert_file_contains "$path" "{{ADMIN_PASSWORD_HASH}}"
@@ -153,8 +161,8 @@ test_render_installer_config_script() {
     rendered_path="$(mktemp)"
     expected_kernel_append=$'console=ttyS0,115200 rd.debug rd.break="pre-mount" path=C:\\temp\\logs'
     INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
-    ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
-    EXTRA_USER_BLOCKS=$'[[customizations.user]]\nname = "root"\nkey = "ssh-ed25519 AAAATEST rendered-root"\n' \
+    ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
+    EXTRA_USER_BLOCKS=$'[[customizations.user]]\nname = "root"\nkey = "ssh-ed25519 AAAATEST rendered-root ci-{fixture}"\n' \
     EXTRA_KERNEL_APPEND="$expected_kernel_append" \
     "$script_path" >"$rendered_path"
 
@@ -173,10 +181,68 @@ test_render_installer_config_script_rejects_unsafe_passphrase() {
     assert_command_fails_contains "unsafe INSTALL_LUKS_PASSPHRASE" \
         env \
         INSTALL_LUKS_PASSPHRASE="rendered passphrase" \
-        ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
+        ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
         EXTRA_USER_BLOCKS="" \
         EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
         "$script_path"
+
+    assert_command_fails_contains "unsafe INSTALL_LUKS_PASSPHRASE" \
+        env \
+        INSTALL_LUKS_PASSPHRASE='rendered"passphrase' \
+        ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
+        EXTRA_USER_BLOCKS="" \
+        EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+        "$script_path"
+}
+
+test_render_installer_config_script_rejects_multiline_kernel_append() {
+    local script_path="$REPO_ROOT/scripts/render-installer-config.sh"
+
+    [[ -f "$script_path" ]] || fail "missing file: $script_path"
+    assert_command_fails_contains "EXTRA_KERNEL_APPEND must not contain control characters" \
+        env \
+        INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
+        ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
+        EXTRA_USER_BLOCKS="" \
+        EXTRA_KERNEL_APPEND=$'console=ttyS0\nrd.debug' \
+        "$script_path"
+}
+
+test_render_installer_config_script_rejects_unknown_leftover_placeholders() {
+    local script_path="$REPO_ROOT/scripts/render-installer-config.sh"
+    local template_path="$REPO_ROOT/config.toml.in"
+    local backup_path
+
+    [[ -f "$script_path" ]] || fail "missing file: $script_path"
+    [[ -f "$template_path" ]] || fail "missing file: $template_path"
+
+    (
+        backup_path="$(mktemp)"
+        cp "$template_path" "$backup_path"
+        trap 'cp "$backup_path" "$template_path"; rm -f "$backup_path"' EXIT
+
+        printf '\nunknown = "{{LEFTOVER_PLACEHOLDER}}"\n' >>"$template_path"
+
+        assert_command_fails_contains "unresolved template placeholders remain" \
+            env \
+            INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
+            ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
+            EXTRA_USER_BLOCKS="" \
+            EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+            "$script_path"
+    )
+}
+
+test_guide_documents_rendered_installer_template() {
+    local path="$REPO_ROOT/guide.md"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+    assert_file_contains "$path" "{{EXTRA_USER_BLOCKS}}"
+    assert_file_contains "$path" 'volume_id = "FEDORA-BOOTC-STARTER"'
+    assert_file_contains "$path" "openssl passwd -6 'your-pw'"
+    assert_file_contains "$path" "export INSTALL_LUKS_PASSPHRASE='temporary-luks-passphrase'"
+    assert_file_contains "$path" "./scripts/render-installer-config.sh > \"\$RENDERED_CONFIG\""
+    assert_file_not_contains "$path" 'python3 -c "import crypt'
 }
 
 run_tests() {
@@ -188,7 +254,9 @@ run_tests() {
             test_config_toml_template
             test_render_installer_config_script
             test_render_installer_config_script_rejects_unsafe_passphrase
-            test_config_toml
+            test_render_installer_config_script_rejects_multiline_kernel_append
+            test_render_installer_config_script_rejects_unknown_leftover_placeholders
+            test_guide_documents_rendered_installer_template
             test_config_ci_toml
         )
     fi

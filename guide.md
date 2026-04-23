@@ -38,7 +38,7 @@ One practical consequence: the image's first-boot bootstrap does **not** install
 ```
 kinoite-fw13/
 ├── Containerfile
-├── config.toml                  # kickstart wrapper for bootc-image-builder
+├── config.toml.in               # authoritative installer template
 ├── cosign.pub                   # public half of the signing key (committed)
 ├── Makefile
 ├── bootstrap/                   # baked into the image at /usr/share/bootstrap
@@ -263,12 +263,11 @@ systemctl reboot
 
 If your signature, key, or policy is misconfigured, `bootc` will refuse the pull with a clear error — which is exactly what you want. You'll know at `bootc upgrade` time, not at reboot.
 
-## 3. `config.toml` (installer kickstart)
+## 3. `config.toml.in` + rendered `config.toml` (installer kickstart)
 
 ```toml
-# Consumed by bootc-image-builder --type=anaconda-iso.
-# `bootc-image-builder` injects the image deployment verb automatically — do
-# NOT include `ostreecontainer` or `bootc` here.
+# Authoritative installer template. Render with
+# `scripts/render-installer-config.sh` before use.
 
 [customizations.installer.kickstart]
 contents = """
@@ -282,13 +281,13 @@ network --bootproto=dhcp --device=link --activate --hostname=fw13
 zerombr
 clearpart --all --initlabel --disklabel=gpt
 reqpart --add-boot
-part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=installer-temp-change-me
+part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase={{INSTALL_LUKS_PASSPHRASE}}
 
 rootpw --lock
 # Password hash for "CHANGE_ME!!!" — this is intentionally a throwaway.
 # First thing after first login: `passwd` to change it.
-# Regenerate with: python3 -c "import crypt; print(crypt.crypt('your-pw', crypt.mksalt(crypt.METHOD_SHA512)))"
-user --name=netf --groups=wheel --iscrypted --password='$6$YdvxSXl6YUHhOzEf$YTvt9PEWKWpTVcb.Y4N/Qlwp.cpMmQbegc8OIFsturFPjOtuYWw4Uzwy5dHlwNiqqiaMd9mfUlJH6wn.EA1Wo0'
+# Regenerate with: `openssl passwd -6 'your-pw'`
+user --name=netf --groups=wheel --iscrypted --password='{{ADMIN_PASSWORD_HASH}}'
 
 services --enabled=sshd,tailscaled
 firstboot --disable
@@ -297,15 +296,32 @@ reboot --eject
 
 # User creation happens above, so disable Anaconda's users module
 [customizations.installer.modules]
-disable = [ "org.fedoraproject.Anaconda.Modules.Users" ]
+disable = ["org.fedoraproject.Anaconda.Modules.Users"]
+
+{{EXTRA_USER_BLOCKS}}
+[customizations.kernel]
+append = "{{EXTRA_KERNEL_APPEND}}"
 
 [customizations.iso]
-volume_id = "KINOITE-FW13-44"
+volume_id = "FEDORA-BOOTC-STARTER"
 ```
 
-The user password hash above decodes to `CHANGE_ME!!!` — deliberately weak and one-use. On first login, run `passwd` immediately to change it. If you'd rather not ship a known hash in the ISO at all, drop the `--password=` flag and Anaconda will prompt for a password during install (breaks fully-unattended but only costs one keystroke interaction).
+Both local builds and CI render a real `config.toml` from `config.toml.in` at runtime. The rendered file injects the temporary installer LUKS passphrase, the admin password hash, any extra user blocks, and optional debug kernel args without committing those values to git.
 
-The installer LUKS passphrase (`installer-temp-change-me` above) is separately wiped by the first-boot bootstrap once TPM2 + FIDO2 + recovery key are enrolled.
+For the local `make iso` path, only `INSTALL_LUKS_PASSPHRASE` is mandatory. `ADMIN_PASSWORD_HASH` defaults to the documented throwaway `CHANGE_ME!!!` hash unless you override it.
+
+If you override `ADMIN_PASSWORD_HASH`, export it in the shell before invoking `make iso` so the `$` characters in the SHA-512 crypt hash survive intact.
+
+```bash
+export INSTALL_LUKS_PASSPHRASE='temporary-luks-passphrase'
+# Optional override:
+# export ADMIN_PASSWORD_HASH="$(openssl passwd -6 'your-pw')"
+RENDERED_CONFIG="$(mktemp)"
+./scripts/render-installer-config.sh > "$RENDERED_CONFIG"
+make iso
+```
+
+The temporary installer LUKS passphrase is separately wiped by the first-boot bootstrap once TPM2 + recovery are enrolled.
 
 ## 4. Bootstrap scripts
 
@@ -828,10 +844,14 @@ sign:  ## cosign sign the pushed image with local keypair (cosign.key)
 
 iso:  build  ## Build the unattended installer ISO
  mkdir -p $(OUTPUT_DIR)
+ @test -n "$$INSTALL_LUKS_PASSPHRASE" || { echo "ERROR: INSTALL_LUKS_PASSPHRASE is required"; exit 1; }
+ RENDERED_CONFIG=$$(mktemp "$(PWD)/$(OUTPUT_DIR)/installer-config.XXXXXX.toml"); \
+ trap 'rm -f "$$RENDERED_CONFIG"' EXIT; \
+ ./scripts/render-installer-config.sh > "$$RENDERED_CONFIG"; \
  sudo podman run --rm -it --privileged --pull=newer \
   --security-opt label=type:unconfined_t \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
-  -v $(PWD)/config.toml:/config.toml:ro \
+  -v $$RENDERED_CONFIG:/config.toml:ro \
   -v $(PWD)/$(OUTPUT_DIR):/output \
   $(BUILDER_IMG) \
   --type anaconda-iso \
@@ -1058,7 +1078,7 @@ jobs:
           sudo podman run --rm --privileged --pull=newer \
               --security-opt label=type:unconfined_t \
               -v /var/lib/containers/storage:/var/lib/containers/storage \
-              -v $PWD/config-ci.toml:/config.toml:ro \
+              -v $PWD/config-ci-rendered.toml:/config.toml:ro \
               -v $PWD/output:/output \
               quay.io/centos-bootc/bootc-image-builder:latest \
               --type qcow2 --config /config.toml \

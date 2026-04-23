@@ -21,8 +21,18 @@ cosign verify --key cosign.pub ghcr.io/netf/fedora-bootc-starter:44
 On a Linux workstation:
 
 ```bash
+export INSTALL_LUKS_PASSPHRASE='temporary-luks-passphrase'
 make iso
 make usb DEV=/dev/sdX
+```
+
+`make iso` renders a temporary installer config from `config.toml.in`. For the local path, only `INSTALL_LUKS_PASSPHRASE` is required. `ADMIN_PASSWORD_HASH` defaults to the documented throwaway `CHANGE_ME!!!` hash unless you override it.
+
+If you do want to override the admin hash, export it in the shell first so the `$` characters survive intact:
+
+```bash
+export ADMIN_PASSWORD_HASH='$6$...'
+make iso
 ```
 
 On the Framework 13 Pro:
