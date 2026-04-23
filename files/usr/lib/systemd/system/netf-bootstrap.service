@@ -1,0 +1,15 @@
+[Unit]
+Description=Piotr first-boot bootstrap (LUKS enrollment, firmware, EC tuning)
+After=systemd-user-sessions.service network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/lib/bootstrap/.all.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/share/bootstrap/run-all.sh --interactive
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
