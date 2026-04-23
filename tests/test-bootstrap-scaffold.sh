@@ -122,10 +122,30 @@ test_luks_tpm2_script() {
     assert_file_contains "$path" "marker_write \"10-tpm2\""
 }
 
+test_luks_fido2_script() {
+    local path="$REPO_ROOT/bootstrap/11-luks-fido2.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! has_encrypted_root; then"
+    assert_file_contains "$path" "skip \"root is not LUKS-encrypted - FIDO2 enrollment N/A\""
+    assert_file_contains "$path" "if ! has_yubikey; then"
+    assert_file_contains "$path" "skip \"no YubiKey detected - plug one in and re-run if you want FIDO2\""
+    assert_file_contains "$path" "DEV=\$(luks_device)"
+    assert_file_contains "$path" "if has_token \"\$DEV\" \"systemd-fido2\"; then"
+    assert_file_contains "$path" "systemd-cryptenroll \"\$DEV\" \\"
+    assert_file_contains "$path" "--fido2-device=auto \\"
+    assert_file_contains "$path" "--fido2-with-client-pin=yes \\"
+    assert_file_contains "$path" "--fido2-with-user-presence=yes"
+    assert_file_contains "$path" "marker_write \"11-fido2\""
+}
+
 test_netf_bootstrap_service
 test_common_library
 test_sanity_script
 test_firmware_update_script
 test_luks_tpm2_script
+test_luks_fido2_script
 
 echo "PASS: bootstrap-scaffold"
