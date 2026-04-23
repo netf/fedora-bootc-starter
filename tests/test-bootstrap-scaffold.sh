@@ -19,6 +19,17 @@ assert_file_matches() {
     [[ "$actual" == "$expected" ]] || fail "unexpected contents in $path"
 }
 
+assert_file_contains() {
+    local path="$1"
+    local needle="$2"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    local actual
+    actual="$(<"$path")"
+    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
+}
+
 test_netf_bootstrap_service() {
     local expected
     expected="$(cat <<'EOF'
@@ -43,6 +54,26 @@ EOF
     assert_file_matches "$REPO_ROOT/files/usr/lib/systemd/system/netf-bootstrap.service" "$expected"
 }
 
+test_common_library() {
+    local path="$REPO_ROOT/bootstrap/lib/common.sh"
+
+    assert_file_contains "$path" "set -euo pipefail"
+    assert_file_contains "$path" "log()  { printf '\\e[1;34m[bootstrap]\\e[0m %s\\n' \"\$*\" >&2; }"
+    assert_file_contains "$path" "require_root() {"
+    assert_file_contains "$path" "is_framework_laptop() {"
+    assert_file_contains "$path" "is_vm() {"
+    assert_file_contains "$path" "has_tpm2() {"
+    assert_file_contains "$path" "has_yubikey() {"
+    assert_file_contains "$path" "has_fingerprint_reader() {"
+    assert_file_contains "$path" "has_encrypted_root() {"
+    assert_file_contains "$path" "luks_device() {"
+    assert_file_contains "$path" "crypt_mapper_name() {"
+    assert_file_contains "$path" "has_token() {"
+    assert_file_contains "$path" "marker_done()  { [[ -f \"/var/lib/bootstrap/.\${1}.done\" ]]; }"
+    assert_file_contains "$path" "marker_write() { mkdir -p /var/lib/bootstrap && touch \"/var/lib/bootstrap/.\${1}.done\"; }"
+}
+
 test_netf_bootstrap_service
+test_common_library
 
 echo "PASS: bootstrap-scaffold"
