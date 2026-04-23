@@ -1,0 +1,16 @@
+{
+  "default": [{"type": "insecureAcceptAnything"}],
+  "transports": {
+    "docker": {
+      "ghcr.io/netf": [
+        {
+          "type": "sigstoreSigned",
+          "keyPath": "/usr/etc/containers/pubkey.pem",
+          "signedIdentity": {"type": "matchRepository"}
+        }
+      ],
+      "quay.io/fedora-ostree-desktops": [{"type": "insecureAcceptAnything"}],
+      "quay.io/centos-bootc": [{"type": "insecureAcceptAnything"}]
+    }
+  }
+}

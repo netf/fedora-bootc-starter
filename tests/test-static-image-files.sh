@@ -35,6 +35,17 @@ EOF
     assert_file_matches "$REPO_ROOT/files/usr/etc/motd" "$expected"
 }
 
+test_containers_policy() {
+    local path="$REPO_ROOT/files/usr/etc/containers/policy.json"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    local compact
+    compact="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1])), separators=(",", ":")))' "$path")"
+    [[ "$compact" == '{"default":[{"type":"insecureAcceptAnything"}],"transports":{"docker":{"ghcr.io/netf":[{"type":"sigstoreSigned","keyPath":"/usr/etc/containers/pubkey.pem","signedIdentity":{"type":"matchRepository"}}],"quay.io/fedora-ostree-desktops":[{"type":"insecureAcceptAnything"}],"quay.io/centos-bootc":[{"type":"insecureAcceptAnything"}]}}}' ]] || fail "unexpected contents in $path"
+}
+
 test_motd
+test_containers_policy
 
 echo "PASS: static-image-files"
