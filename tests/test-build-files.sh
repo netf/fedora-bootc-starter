@@ -61,6 +61,7 @@ test_makefile() {
     assert_file_contains "$path" "build:  ## Build the bootc image locally (requires Linux host)"
     assert_file_contains "$path" "sign:  ## cosign sign the pushed image DIGEST (not tag)"
     assert_file_contains "$path" "iso: build  ## Build the unattended installer ISO"
+    assert_file_contains "$path" "--type anaconda-iso --rootfs btrfs"
     assert_file_contains "$path" "test-vm: iso  ## Boot the ISO in QEMU with swtpm for end-to-end testing"
 }
 

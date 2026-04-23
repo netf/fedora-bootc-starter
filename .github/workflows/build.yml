@@ -192,7 +192,7 @@ jobs:
               -v $PWD/config-ci-rendered.toml:/config.toml:ro \
               -v $PWD/output:/output \
               quay.io/centos-bootc/bootc-image-builder:latest \
-              --type qcow2 --config /config.toml \
+              --type qcow2 --rootfs btrfs --config /config.toml \
               localhost/test-image:ci
           sudo chown -R "$USER" output
           ls -lh output/qcow2/

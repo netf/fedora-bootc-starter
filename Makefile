@@ -51,7 +51,7 @@ iso: build  ## Build the unattended installer ISO
 	  -v $(PWD)/config.toml:/config.toml:ro \
 	  -v $(PWD)/$(OUTPUT_DIR):/output \
 	  $(BUILDER_IMG) \
-	  --type anaconda-iso \
+	  --type anaconda-iso --rootfs btrfs \
 	  --config /config.toml \
 	  $(IMAGE_REF)
 	@echo ""
