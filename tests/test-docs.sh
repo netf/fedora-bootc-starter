@@ -19,6 +19,17 @@ assert_file_contains() {
     [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
 }
 
+assert_file_not_contains() {
+    local path="$1"
+    local needle="$2"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    local actual
+    actual="$(<"$path")"
+    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
+}
+
 test_readme() {
     local path="$REPO_ROOT/README.md"
 
@@ -32,6 +43,8 @@ test_readme() {
     assert_file_contains "$path" "## References"
     assert_file_contains "$path" "ghcr.io/netf/fedora-bootc-starter:44"
     assert_file_contains "$path" "cosign verify --key cosign.pub ghcr.io/netf/fedora-bootc-starter:44"
+    assert_file_contains "$path" "sbsigntools"
+    assert_file_not_contains "$path" "sbctl"
 }
 
 run_tests() {

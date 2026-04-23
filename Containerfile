@@ -30,7 +30,7 @@ RUN rpm-ostree install \
       tailscale wireguard-tools \
       tpm2-tools yubikey-manager fido2-tools \
       fprintd fprintd-pam \
-      sbctl \
+      sbsigntools \
       iio-sensor-proxy \
       fwupd \
       kdeconnectd \

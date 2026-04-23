@@ -19,6 +19,17 @@ assert_file_contains() {
     [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
 }
 
+assert_file_not_contains() {
+    local path="$1"
+    local needle="$2"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    local actual
+    actual="$(<"$path")"
+    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
+}
+
 test_build_workflow() {
     local path="$REPO_ROOT/.github/workflows/build.yml"
 
@@ -33,6 +44,8 @@ test_build_workflow() {
     assert_file_contains "$path" "uses: sigstore/cosign-installer@v3"
     assert_file_contains "$path" "config-ci-rendered.toml"
     assert_file_contains "$path" "uses: actions/upload-artifact@v4"
+    assert_file_contains "$path" "sbverify"
+    assert_file_not_contains "$path" "sbctl"
 }
 
 run_tests() {

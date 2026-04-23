@@ -1263,7 +1263,7 @@ RUN rpm-ostree install \
       tailscale wireguard-tools \
       tpm2-tools yubikey-manager fido2-tools \
       fprintd fprintd-pam \
-      sbctl \
+      sbsigntools \
       iio-sensor-proxy \
       fwupd \
       kdeconnectd \
@@ -1704,7 +1704,7 @@ jobs:
             # Expected binaries
             command -v chezmoi mise alacritty distrobox tailscale tpm2_pcrread \
                        ykman fido2-token fwupdmgr framework_tool fprintd-enroll \
-                       sbctl restic bpftool bpftrace kdeconnectd iio-sensor-proxy
+                       sbverify restic bpftool bpftrace kdeconnectd iio-sensor-proxy
 
             # Negative assertions — must NOT be in image (dotfiles boundary)
             ! command -v eza
@@ -1841,13 +1841,13 @@ jobs:
 
           echo "─── Image-baked tooling ───"
           $SSH 'command -v chezmoi mise alacritty framework_tool'
-          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbctl'
+          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbverify'
 
           echo "─── TPM2 visible via swtpm ───"
           $SSH 'sudo tpm2_pcrread sha256:7,11'
 
-          echo "─── sbctl status readable ───"
-          $SSH 'sudo sbctl status || true'
+          echo "─── sbverify available ───"
+          $SSH 'sbverify --help >/dev/null'
 
           echo "─── Hardware-gated scripts skip gracefully ───"
           $SSH 'sudo /usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
@@ -1977,7 +1977,7 @@ systemctl reboot
 
 Minimal host foundation only. Package list authoritative in `Containerfile`; design rationale in `docs/superpowers/specs/2026-04-23-fedora-bootc-starter-design.md` §6.
 
-**In the image:** `git`, `chezmoi`, `mise`, `alacritty`, `podman-compose`, `distrobox`, `tailscale`, `wireguard-tools`, `tpm2-tools`, `yubikey-manager`, `fido2-tools`, `fprintd`, `sbctl`, `iio-sensor-proxy`, `fwupd`, `framework_tool` (built from source), `kdeconnectd`, `jetbrains-mono-fonts-all`, `fira-code-fonts`, `bpftool`, `bpftrace`, `kernel-tools`, `restic`.
+**In the image:** `git`, `chezmoi`, `mise`, `alacritty`, `podman-compose`, `distrobox`, `tailscale`, `wireguard-tools`, `tpm2-tools`, `yubikey-manager`, `fido2-tools`, `fprintd`, `sbsigntools` (`sbverify`/`sbsign`), `iio-sensor-proxy`, `fwupd`, `framework_tool` (built from source), `kdeconnectd`, `jetbrains-mono-fonts-all`, `fira-code-fonts`, `bpftool`, `bpftrace`, `kernel-tools`, `restic`.
 
 **Deliberately NOT in the image (owned by dotfiles):** `starship`, `eza`, `bat`, `ripgrep`, `fd`, `jq`, `yq`, `gh`, `just`, `fzf`, `delta`, `zoxide`, flatpaks, language runtimes, toolbox contents.
 

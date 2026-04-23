@@ -68,7 +68,7 @@ Four execution phases, strict separation of responsibility:
 **LUKS / auth hardware (used by first-boot as root):**
 - `tpm2-tools`, `yubikey-manager`, `fido2-tools`
 - `fprintd`, `fprintd-pam`
-- `sbctl`
+- `sbsigntools` (`sbverify`, `sbsign`)
 
 **Framework hardware:**
 - `iio-sensor-proxy`, `fwupd`
@@ -278,7 +278,7 @@ Gate for `build` and `e2e-vm`.
 4. `podman build --build-arg FEDORA_VERSION=$V -t $IMAGE_REF .`
 5. `podman run --rm $IMAGE_REF bootc container lint`.
 6. **Smoke test** inside the container:
-   - Every expected binary present: `chezmoi mise alacritty distrobox tailscale tpm2_pcrread ykman fido2-token fwupdmgr framework_tool fprintd-enroll sbctl restic bpftool bpftrace kdeconnectd iio-sensor-proxy`.
+   - Every expected binary present: `chezmoi mise alacritty distrobox tailscale tpm2_pcrread ykman fido2-token fwupdmgr framework_tool fprintd-enroll sbverify restic bpftool bpftrace kdeconnectd iio-sensor-proxy`.
    - Every bootstrap script exists, is executable, parses via `bash -n`.
    - `/usr/lib/bootc/kargs.d/10-fw13.toml` present with expected kargs.
    - `systemctl is-enabled netf-bootstrap.service`.
@@ -310,7 +310,7 @@ Gate for `build` and `e2e-vm`.
     - `11-luks-fido2.sh --check` → skip (no YubiKey, no LUKS).
     - `05-firmware-update.sh --check` → skip (VM).
     - `run-all.sh --check` → exit 0 overall.
-    - `sbctl status` succeeds.
+    - `sbverify --help` succeeds.
 12. Shutdown VM cleanly; upload serial log artifact on failure.
 
 ### 10.4 What CI cannot verify (manual on real Framework 13 Pro)

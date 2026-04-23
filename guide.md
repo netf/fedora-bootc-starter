@@ -25,7 +25,7 @@ The image provides the **minimum host needed to run the dotfiles bootstrap**, no
 
 | Layer                       | What                                                                                                                                                                                                      | Where                    |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| **Image only**              | Hardware drivers, firmware tooling (`framework_tool`, `fwupd`), LUKS/TPM/FIDO2 stack, `fprintd`, `tailscale`, `sbctl`, kernel-matched tools (`bpftool`, `bpftrace`), fonts, system services               | Containerfile            |
+| **Image only**              | Hardware drivers, firmware tooling (`framework_tool`, `fwupd`), LUKS/TPM/FIDO2 stack, `fprintd`, `tailscale`, `sbsigntools`, kernel-matched tools (`bpftool`, `bpftrace`), fonts, system services          | Containerfile            |
 | **Image — host foundation** | `git` (to clone dotfiles), `chezmoi`, `mise`, `starship`, `alacritty`, `podman`/`distrobox` (toolbox runtime)                                                                                             | Containerfile            |
 | **Dotfiles**                | `gh`, `just`, `jq`, `yq`, modern CLI (`eza`/`bat`/`ripgrep`/`fd`/`fzf`/`delta`/`zoxide`), kubectl/helm/k9s/kind/k3d, terraform/terragrunt, AWS/Azure CLI, sops/age, dnscrypt-proxy, all language runtimes | `mise` + chezmoi scripts |
 | **Dotfiles — toolbox**      | `zsh`, `tmux`, `neovim`, all dev CLIs                                                                                                                                                                     | `dev` toolbox container  |
@@ -104,7 +104,7 @@ RUN rpm-ostree install \
       # LUKS / auth hardware (used by first-boot bootstrap as root)
       tpm2-tools yubikey-manager fido2-tools \
       fprintd fprintd-pam \
-      sbctl \
+      sbsigntools \
       # Framework-specific hardware support
       iio-sensor-proxy \
       fwupd \

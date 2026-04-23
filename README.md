@@ -63,7 +63,7 @@ systemctl reboot
 
 Minimal host foundation only. The package list is authoritative in `Containerfile`; design rationale lives in [`docs/superpowers/specs/2026-04-23-fedora-bootc-starter-design.md`](docs/superpowers/specs/2026-04-23-fedora-bootc-starter-design.md).
 
-In the image: `git`, `chezmoi`, `mise`, `alacritty`, `podman-compose`, `distrobox`, `tailscale`, `wireguard-tools`, `tpm2-tools`, `yubikey-manager`, `fido2-tools`, `fprintd`, `sbctl`, `iio-sensor-proxy`, `fwupd`, `framework_tool` (built from source), `kdeconnectd`, `jetbrains-mono-fonts-all`, `fira-code-fonts`, `bpftool`, `bpftrace`, `kernel-tools`, `restic`.
+In the image: `git`, `chezmoi`, `mise`, `alacritty`, `podman-compose`, `distrobox`, `tailscale`, `wireguard-tools`, `tpm2-tools`, `yubikey-manager`, `fido2-tools`, `fprintd`, `sbsigntools` (`sbverify`/`sbsign`), `iio-sensor-proxy`, `fwupd`, `framework_tool` (built from source), `kdeconnectd`, `jetbrains-mono-fonts-all`, `fira-code-fonts`, `bpftool`, `bpftrace`, `kernel-tools`, `restic`.
 
 Deliberately not in the image and owned by dotfiles: `starship`, `eza`, `bat`, `ripgrep`, `fd`, `jq`, `yq`, `gh`, `just`, `fzf`, `delta`, `zoxide`, flatpaks, language runtimes, and toolbox contents.
 

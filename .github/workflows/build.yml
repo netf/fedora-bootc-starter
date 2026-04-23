@@ -114,7 +114,7 @@ jobs:
 
             command -v chezmoi mise alacritty distrobox tailscale tpm2_pcrread \
                        ykman fido2-token fwupdmgr framework_tool fprintd-enroll \
-                       sbctl restic bpftool bpftrace kdeconnectd iio-sensor-proxy
+                       sbverify restic bpftool bpftrace kdeconnectd iio-sensor-proxy
 
             ! command -v eza
             ! command -v bat
@@ -244,13 +244,13 @@ jobs:
 
           echo "Image-baked tooling"
           $SSH 'command -v chezmoi mise alacritty framework_tool'
-          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbctl'
+          $SSH 'command -v tpm2_pcrread ykman fwupdmgr sbverify'
 
           echo "TPM2 visible via swtpm"
           $SSH 'sudo tpm2_pcrread sha256:7,11'
 
-          echo "sbctl status readable"
-          $SSH 'sudo sbctl status || true'
+          echo "sbverify available"
+          $SSH 'sbverify --help >/dev/null'
 
           echo "Hardware-gated scripts skip gracefully"
           $SSH 'sudo /usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
