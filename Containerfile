@@ -65,7 +65,7 @@ RUN chmod +x /usr/local/bin/framework_tool \
  && grep -q "/etc/containers/pubkey.pem" /etc/containers/policy.json \
  && test -f /etc/containers/pubkey.pem \
  && echo "signature policy wired correctly" \
- && printf 'add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd "\n' \
+ && printf 'add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree "\n' \
       > /usr/lib/dracut/dracut.conf.d/50-luks-unlock.conf \
  && kver=$(rpm -q kernel --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' | sort -V | tail -1) \
  && test -n "$kver" \

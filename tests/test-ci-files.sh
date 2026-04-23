@@ -52,6 +52,7 @@ test_build_workflow() {
     assert_file_contains "$path" "podman login --compat-auth-file \"\$HOME/.docker/config.json\""
     assert_file_contains "$path" "--progress verbose"
     assert_file_contains "$path" "--type qcow2 --rootfs btrfs --config /config.toml"
+    assert_file_contains "$path" "lsinitrd /usr/lib/modules/\$KVER/initramfs.img | grep -q ostree"
     assert_file_contains "$path" "ls -l /usr/share/OVMF"
     assert_file_contains "$path" "/usr/share/OVMF/OVMF_CODE_4M.fd"
     assert_file_contains "$path" "/usr/share/OVMF/OVMF_VARS_4M.fd"

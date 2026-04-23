@@ -137,6 +137,7 @@ jobs:
 
             KVER=$(ls /usr/lib/modules | head -1)
             lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -qE "tpm2|cryptsetup"
+            lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q ostree
 
             echo "smoke tests pass"
           '

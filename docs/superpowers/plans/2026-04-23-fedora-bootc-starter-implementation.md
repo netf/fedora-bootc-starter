@@ -1300,7 +1300,7 @@ RUN set -e; \
 # Initramfs: bake in TPM2 + FIDO2 LUKS unlock modules.
 # Runtime dracut regeneration fails on bootc (/usr is read-only), so we MUST
 # regenerate at build time.
-RUN printf 'add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd "\n' \
+RUN printf 'add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree "\n' \
       > /usr/lib/dracut/dracut.conf.d/50-luks-unlock.conf
 
 RUN set -xe; \

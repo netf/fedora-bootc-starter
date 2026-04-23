@@ -139,7 +139,7 @@ RUN chmod +x /usr/share/bootstrap/*.sh /usr/share/bootstrap/lib/*.sh
 # The initramfs must be built with these modules NOW so that post-enrollment
 # unlock just works on next boot.
 RUN cat > /usr/lib/dracut/dracut.conf.d/50-luks-unlock.conf <<'EOF'
-add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 "
+add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree "
 EOF
 
 RUN set -xe; \

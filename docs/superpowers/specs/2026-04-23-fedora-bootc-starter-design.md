@@ -107,7 +107,7 @@ kargs = [
 
 Dracut config at `/usr/lib/dracut/dracut.conf.d/50-luks-unlock.conf`:
 ```
-add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd "
+add_dracutmodules+=" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree "
 ```
 
 Regenerated at build-time (runtime regen is impossible on bootc because `/usr` is read-only):
