@@ -30,18 +30,29 @@ assert_file_contains() {
     [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
 }
 
+assert_file_not_contains() {
+    local path="$1"
+    local needle="$2"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+
+    local actual
+    actual="$(<"$path")"
+    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
+}
+
 test_netf_bootstrap_service() {
     local expected
     expected="$(cat <<'EOF'
 [Unit]
-Description=Piotr first-boot bootstrap (LUKS enrollment, firmware, EC tuning)
+Description=Piotr first-boot core bootstrap (LUKS enrollment, recovery, firmware)
 After=systemd-user-sessions.service network-online.target
 Wants=network-online.target
-ConditionPathExists=!/var/lib/bootstrap/.all.done
+ConditionPathExists=!/var/lib/bootstrap/.core.done
 
 [Service]
 Type=oneshot
-ExecStart=/usr/share/bootstrap/run-all.sh --interactive
+ExecStart=/usr/share/bootstrap/run-profile.sh core
 RemainAfterExit=yes
 StandardOutput=journal+console
 StandardError=journal+console
@@ -52,6 +63,11 @@ EOF
 )"
 
     assert_file_matches "$REPO_ROOT/files/usr/lib/systemd/system/netf-bootstrap.service" "$expected"
+}
+
+test_profile_layout() {
+    [[ -d "$REPO_ROOT/bootstrap/core" ]] || fail "missing directory: $REPO_ROOT/bootstrap/core"
+    [[ -d "$REPO_ROOT/bootstrap/hardware" ]] || fail "missing directory: $REPO_ROOT/bootstrap/hardware"
 }
 
 test_common_library() {
@@ -74,7 +90,7 @@ test_common_library() {
 }
 
 test_sanity_script() {
-    local path="$REPO_ROOT/bootstrap/00-sanity.sh"
+    local path="$REPO_ROOT/bootstrap/core/00-sanity.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -89,7 +105,7 @@ test_sanity_script() {
 }
 
 test_firmware_update_script() {
-    local path="$REPO_ROOT/bootstrap/05-firmware-update.sh"
+    local path="$REPO_ROOT/bootstrap/core/05-firmware-update.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -105,7 +121,7 @@ test_firmware_update_script() {
 }
 
 test_luks_tpm2_script() {
-    local path="$REPO_ROOT/bootstrap/10-luks-tpm2.sh"
+    local path="$REPO_ROOT/bootstrap/core/10-luks-tpm2.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -123,7 +139,7 @@ test_luks_tpm2_script() {
 }
 
 test_luks_fido2_script() {
-    local path="$REPO_ROOT/bootstrap/11-luks-fido2.sh"
+    local path="$REPO_ROOT/bootstrap/hardware/11-luks-fido2.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -142,7 +158,7 @@ test_luks_fido2_script() {
 }
 
 test_luks_recovery_script() {
-    local path="$REPO_ROOT/bootstrap/12-luks-recovery.sh"
+    local path="$REPO_ROOT/bootstrap/core/12-luks-recovery.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -159,7 +175,7 @@ test_luks_recovery_script() {
 }
 
 test_luks_wipe_installer_script() {
-    local path="$REPO_ROOT/bootstrap/13-luks-wipe-installer.sh"
+    local path="$REPO_ROOT/bootstrap/core/13-luks-wipe-installer.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -169,14 +185,14 @@ test_luks_wipe_installer_script() {
     assert_file_contains "$path" "DUMP=\$(cryptsetup luksDump \"\$DEV\")"
     assert_file_contains "$path" "grep -qE '^\\s*0:\\s+luks2' <<<\"\$DUMP\""
     assert_file_contains "$path" "grep -q \"systemd-tpm2\"     <<<\"\$DUMP\" || err \"Refusing: TPM2 not enrolled\""
-    assert_file_contains "$path" "grep -q \"systemd-fido2\"    <<<\"\$DUMP\" || err \"Refusing: FIDO2 not enrolled\""
     assert_file_contains "$path" "grep -q \"systemd-recovery\" <<<\"\$DUMP\" || err \"Refusing: recovery key not enrolled\""
+    assert_file_not_contains "$path" "systemd-fido2"
     assert_file_contains "$path" "cryptsetup luksKillSlot \"\$DEV\" 0"
     assert_file_contains "$path" "marker_write \"13-wipe\""
 }
 
 test_fingerprint_enroll_script() {
-    local path="$REPO_ROOT/bootstrap/30-fingerprint-enroll.sh"
+    local path="$REPO_ROOT/bootstrap/hardware/30-fingerprint-enroll.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
@@ -191,7 +207,7 @@ test_fingerprint_enroll_script() {
 }
 
 test_framework_ec_script() {
-    local path="$REPO_ROOT/bootstrap/40-framework-ec.sh"
+    local path="$REPO_ROOT/bootstrap/hardware/40-framework-ec.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
@@ -206,21 +222,33 @@ test_framework_ec_script() {
     assert_file_contains "$path" "marker_write \"40-ec\""
 }
 
+test_run_profile_script() {
+    local path="$REPO_ROOT/bootstrap/run-profile.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "PROFILE=\"\${1:?profile required}\""
+    assert_file_contains "$path" "case \"\$PROFILE\" in"
+    assert_file_contains "$path" "core)"
+    assert_file_contains "$path" "/usr/share/bootstrap/core"
+    assert_file_contains "$path" "hardware)"
+    assert_file_contains "$path" "/usr/share/bootstrap/hardware"
+    assert_file_contains "$path" "mapfile -t STEPS < <(find \"\$STEP_DIR\" -maxdepth 1 -name '[0-9]*.sh' -type f | sort)"
+    assert_file_contains "$path" "if ! bash \"\$step\" --check; then"
+    assert_file_contains "$path" "marker_write \"\$PROFILE\""
+}
+
 test_run_all_script() {
     local path="$REPO_ROOT/bootstrap/run-all.sh"
 
     assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
     assert_file_contains "$path" "require_root"
     assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
-    assert_file_contains "$path" "cd /usr/share/bootstrap"
-    assert_file_contains "$path" "mapfile -t STEPS < <(find . -maxdepth 1 -name '[0-9]*.sh' -type f | sort)"
-    assert_file_contains "$path" "if [[ \${#STEPS[@]} -eq 0 ]]; then"
-    assert_file_contains "$path" "FAILED=0"
-    assert_file_contains "$path" "for step in \"\${STEPS[@]}\"; do"
-    assert_file_contains "$path" "if [[ \$CHECK -eq 1 ]]; then"
-    assert_file_contains "$path" "if ! \"\$step\" --check; then"
+    assert_file_contains "$path" "for profile in core hardware; do"
+    assert_file_contains "$path" "/usr/share/bootstrap/run-profile.sh \"\$profile\""
+    assert_file_contains "$path" "/usr/share/bootstrap/run-profile.sh \"\$profile\" --check"
     assert_file_contains "$path" "marker_write \"all\""
-    assert_file_contains "$path" "ok \"Bootstrap complete. Reboot recommended.\""
+    assert_file_contains "$path" "ok \"All bootstrap profiles completed. Reboot recommended.\""
+    assert_file_not_contains "$path" "find . -maxdepth 1 -name '[0-9]*.sh'"
 }
 
 run_tests() {
@@ -230,6 +258,7 @@ run_tests() {
     if [[ ${#tests[@]} -eq 0 ]]; then
         tests=(
             test_netf_bootstrap_service
+            test_profile_layout
             test_common_library
             test_sanity_script
             test_firmware_update_script
@@ -239,6 +268,7 @@ run_tests() {
             test_luks_wipe_installer_script
             test_fingerprint_enroll_script
             test_framework_ec_script
+            test_run_profile_script
             test_run_all_script
         )
     fi

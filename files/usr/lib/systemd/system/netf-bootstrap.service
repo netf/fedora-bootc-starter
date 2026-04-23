@@ -1,12 +1,12 @@
 [Unit]
-Description=Piotr first-boot bootstrap (LUKS enrollment, firmware, EC tuning)
+Description=Piotr first-boot core bootstrap (LUKS enrollment, recovery, firmware)
 After=systemd-user-sessions.service network-online.target
 Wants=network-online.target
-ConditionPathExists=!/var/lib/bootstrap/.all.done
+ConditionPathExists=!/var/lib/bootstrap/.core.done
 
 [Service]
 Type=oneshot
-ExecStart=/usr/share/bootstrap/run-all.sh --interactive
+ExecStart=/usr/share/bootstrap/run-profile.sh core
 RemainAfterExit=yes
 StandardOutput=journal+console
 StandardError=journal+console
