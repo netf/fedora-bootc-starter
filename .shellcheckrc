@@ -1,0 +1,5 @@
+# Follow source= directives (for `source /usr/share/bootstrap/lib/common.sh`)
+external-sources=true
+
+# Allow SCRIPTDIR/SCRIPT_DIR style patterns
+disable=SC1091
