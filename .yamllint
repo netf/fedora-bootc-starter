@@ -1,0 +1,12 @@
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    # GitHub Actions 'on:' keyword trips default truthy rule
+    allowed-values: ['true', 'false', 'on', 'off']
+  document-start: disable
+  comments:
+    min-spaces-from-content: 1
