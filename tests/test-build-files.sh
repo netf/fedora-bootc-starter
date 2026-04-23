@@ -68,12 +68,22 @@ test_makefile() {
     assert_file_contains "$path" "test-vm: iso  ## Boot the ISO in QEMU with swtpm for end-to-end testing"
 }
 
+test_makefile_renders_installer_config() {
+    local path="$REPO_ROOT/Makefile"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+    assert_file_contains "$path" './scripts/render-installer-config.sh > "$$RENDERED_CONFIG"'
+    assert_file_contains "$path" 'RENDERED_CONFIG=$$(mktemp'
+    assert_file_contains "$path" '-v "$$RENDERED_CONFIG":/config.toml:ro'
+    assert_file_not_contains "$path" '-v $(PWD)/config.toml:/config.toml:ro'
+}
+
 run_tests() {
     local tests=("$@")
     local test_name
 
     if [[ ${#tests[@]} -eq 0 ]]; then
-        tests=(test_containerfile test_makefile)
+        tests=(test_containerfile test_makefile test_makefile_renders_installer_config)
     fi
 
     for test_name in "${tests[@]}"; do

@@ -37,6 +37,38 @@ assert_toml_parses() {
         || fail "invalid TOML: $path"
 }
 
+assert_command_fails_contains() {
+    local needle="$1"
+    shift
+
+    local output
+    if output="$("$@" 2>&1)"; then
+        fail "expected command to fail: $*"
+    fi
+
+    [[ "$output" == *"$needle"* ]] || fail "expected command failure to contain: $needle"
+}
+
+assert_kernel_append_equals() {
+    local path="$1"
+    local expected="$2"
+
+    python3 - "$path" "$expected" <<'PY'
+import sys
+import tomllib
+
+path = sys.argv[1]
+expected = sys.argv[2]
+
+with open(path, "rb") as fh:
+    data = tomllib.load(fh)
+
+actual = data["customizations"]["kernel"]["append"]
+if actual != expected:
+    raise SystemExit(f"expected kernel append {expected!r}, got {actual!r}")
+PY
+}
+
 render_template_fixture() {
     local template_path="$1"
     local output_path="$2"
@@ -112,16 +144,18 @@ test_config_toml_template() {
 test_render_installer_config_script() {
     local script_path="$REPO_ROOT/scripts/render-installer-config.sh"
     local rendered_path
+    local expected_kernel_append
 
     [[ -f "$script_path" ]] || fail "missing file: $script_path"
     assert_file_contains "$script_path" "INSTALL_LUKS_PASSPHRASE"
     assert_file_contains "$script_path" "ADMIN_PASSWORD_HASH"
 
     rendered_path="$(mktemp)"
+    expected_kernel_append=$'console=ttyS0,115200 rd.debug rd.break="pre-mount" path=C:\\temp\\logs'
     INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
     ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
     EXTRA_USER_BLOCKS=$'[[customizations.user]]\nname = "root"\nkey = "ssh-ed25519 AAAATEST rendered-root"\n' \
-    EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+    EXTRA_KERNEL_APPEND="$expected_kernel_append" \
     "$script_path" >"$rendered_path"
 
     assert_toml_parses "$rendered_path"
@@ -129,7 +163,20 @@ test_render_installer_config_script() {
     assert_file_contains "$rendered_path" "part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=rendered-passphrase"
     assert_file_contains "$rendered_path" "[[customizations.user]]"
     assert_file_contains "$rendered_path" "[customizations.kernel]"
-    assert_file_contains "$rendered_path" "append = \"console=ttyS0,115200 rd.debug\""
+    assert_kernel_append_equals "$rendered_path" "$expected_kernel_append"
+}
+
+test_render_installer_config_script_rejects_unsafe_passphrase() {
+    local script_path="$REPO_ROOT/scripts/render-installer-config.sh"
+
+    [[ -f "$script_path" ]] || fail "missing file: $script_path"
+    assert_command_fails_contains "unsafe INSTALL_LUKS_PASSPHRASE" \
+        env \
+        INSTALL_LUKS_PASSPHRASE="rendered passphrase" \
+        ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
+        EXTRA_USER_BLOCKS="" \
+        EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+        "$script_path"
 }
 
 run_tests() {
@@ -140,6 +187,7 @@ run_tests() {
         tests=(
             test_config_toml_template
             test_render_installer_config_script
+            test_render_installer_config_script_rejects_unsafe_passphrase
             test_config_toml
             test_config_ci_toml
         )

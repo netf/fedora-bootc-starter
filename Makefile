@@ -45,10 +45,13 @@ sign:  ## cosign sign the pushed image DIGEST (not tag)
 
 iso: build  ## Build the unattended installer ISO
 	mkdir -p $(OUTPUT_DIR)
+	RENDERED_CONFIG=$$(mktemp "$(PWD)/$(OUTPUT_DIR)/installer-config.XXXXXX.toml"); \
+	trap 'rm -f "$$RENDERED_CONFIG"' EXIT; \
+	./scripts/render-installer-config.sh > "$$RENDERED_CONFIG"; \
 	sudo podman run --rm -it --privileged --pull=newer \
 	  --security-opt label=type:unconfined_t \
 	  -v /var/lib/containers/storage:/var/lib/containers/storage \
-	  -v $(PWD)/config.toml:/config.toml:ro \
+	  -v "$$RENDERED_CONFIG":/config.toml:ro \
 	  -v $(PWD)/$(OUTPUT_DIR):/output \
 	  $(BUILDER_IMG) \
 	  --type anaconda-iso --rootfs btrfs \
