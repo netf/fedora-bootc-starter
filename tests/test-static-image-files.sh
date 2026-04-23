@@ -45,7 +45,20 @@ test_containers_policy() {
     [[ "$compact" == '{"default":[{"type":"insecureAcceptAnything"}],"transports":{"docker":{"ghcr.io/netf":[{"type":"sigstoreSigned","keyPath":"/usr/etc/containers/pubkey.pem","signedIdentity":{"type":"matchRepository"}}],"quay.io/fedora-ostree-desktops":[{"type":"insecureAcceptAnything"}],"quay.io/centos-bootc":[{"type":"insecureAcceptAnything"}]}}}' ]] || fail "unexpected contents in $path"
 }
 
+test_registries_config() {
+    local expected
+    expected="$(cat <<'EOF'
+docker:
+  ghcr.io/netf:
+    use-sigstore-attachments: true
+EOF
+)"
+
+    assert_file_matches "$REPO_ROOT/files/usr/etc/containers/registries.d/ghcr-io-netf.yaml" "$expected"
+}
+
 test_motd
 test_containers_policy
+test_registries_config
 
 echo "PASS: static-image-files"
