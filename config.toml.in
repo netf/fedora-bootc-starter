@@ -1,5 +1,5 @@
-# Local placeholder copy of the rendered installer config.
-# The authoritative source is config.toml.in.
+# Authoritative installer template for bootc-image-builder.
+# Render with scripts/render-installer-config.sh before use.
 
 [customizations.installer.kickstart]
 contents = """
@@ -23,10 +23,10 @@ firstboot --disable
 reboot --eject
 """
 
-# User creation happens in the kickstart, so disable Anaconda's users module.
 [customizations.installer.modules]
 disable = ["org.fedoraproject.Anaconda.Modules.Users"]
 
+{{EXTRA_USER_BLOCKS}}
 [customizations.kernel]
 append = "{{EXTRA_KERNEL_APPEND}}"
 
