@@ -22,13 +22,13 @@ assert_file_matches() {
 test_motd() {
     local expected
     expected="$(cat <<'EOF'
-┌─────────────────────────────────────────────────────────────┐
-│  System bootstrap complete. To apply dotfiles:              │
-│                                                             │
-│    curl -fsLS https://raw.githubusercontent.com/netf/dotfiles/main/install.sh | bash
-│                                                             │
-│  Or: chezmoi init --apply netf                              │
-└─────────────────────────────────────────────────────────────┘
+System bootstrap complete.
+
+Apply dotfiles:
+  curl -fsLS https://raw.githubusercontent.com/netf/dotfiles/main/install.sh | bash
+
+Or:
+  chezmoi init --apply netf
 EOF
 )"
 
