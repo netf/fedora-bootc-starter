@@ -104,9 +104,28 @@ test_firmware_update_script() {
     assert_file_contains "$path" "marker_write \"05-firmware\""
 }
 
+test_luks_tpm2_script() {
+    local path="$REPO_ROOT/bootstrap/10-luks-tpm2.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && CHECK=1"
+    assert_file_contains "$path" "if ! has_encrypted_root; then"
+    assert_file_contains "$path" "skip \"root is not LUKS-encrypted - TPM2 enrollment N/A\""
+    assert_file_contains "$path" "if ! has_tpm2; then"
+    assert_file_contains "$path" "DEV=\$(luks_device)"
+    assert_file_contains "$path" "MAPPER=\$(crypt_mapper_name)"
+    assert_file_contains "$path" "if has_token \"\$DEV\" \"systemd-tpm2\"; then"
+    assert_file_contains "$path" "systemd-cryptenroll \"\$DEV\" --tpm2-device=auto --tpm2-pcrs=7+11"
+    assert_file_contains "$path" "grep -qE \"^\${MAPPER}.*tpm2-device=auto\" /etc/crypttab"
+    assert_file_contains "$path" "sed -ri \"s|^(\${MAPPER}\\s+\\S+\\s+\\S+)(\\s+.*)?$|\\1 tpm2-device=auto|\" /etc/crypttab"
+    assert_file_contains "$path" "marker_write \"10-tpm2\""
+}
+
 test_netf_bootstrap_service
 test_common_library
 test_sanity_script
 test_firmware_update_script
+test_luks_tpm2_script
 
 echo "PASS: bootstrap-scaffold"
