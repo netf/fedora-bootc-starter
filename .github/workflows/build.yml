@@ -167,6 +167,39 @@ jobs:
               swtpm swtpm-tools \
               podman netcat-openbsd openssh-client
 
+      - name: Locate OVMF firmware
+        run: |
+          ls -l /usr/share/OVMF
+
+          OVMF_CODE=""
+          OVMF_VARS_TEMPLATE=""
+
+          for candidate in \
+              /usr/share/OVMF/OVMF_CODE_4M.fd \
+              /usr/share/OVMF/OVMF_CODE.fd; do
+            if [[ -f "$candidate" ]]; then
+              OVMF_CODE="$candidate"
+              break
+            fi
+          done
+
+          for candidate in \
+              /usr/share/OVMF/OVMF_VARS_4M.fd \
+              /usr/share/OVMF/OVMF_VARS.fd; do
+            if [[ -f "$candidate" ]]; then
+              OVMF_VARS_TEMPLATE="$candidate"
+              break
+            fi
+          done
+
+          test -n "$OVMF_CODE" || { echo "ERROR: OVMF code firmware not found"; exit 1; }
+          test -n "$OVMF_VARS_TEMPLATE" || { echo "ERROR: OVMF vars firmware not found"; exit 1; }
+
+          echo "Using OVMF_CODE=$OVMF_CODE"
+          echo "Using OVMF_VARS_TEMPLATE=$OVMF_VARS_TEMPLATE"
+          echo "OVMF_CODE=$OVMF_CODE" >> "$GITHUB_ENV"
+          echo "OVMF_VARS_TEMPLATE=$OVMF_VARS_TEMPLATE" >> "$GITHUB_ENV"
+
       - name: Verify /dev/kvm available
         run: |
           test -c /dev/kvm || { echo "ERROR: /dev/kvm not present on runner"; exit 1; }
@@ -206,10 +239,15 @@ jobs:
 
       - name: Boot VM in background
         run: |
+          cp "$OVMF_VARS_TEMPLATE" ovmf-vars.fd
+          chmod u+w ovmf-vars.fd
+          : > vm-serial.log
+          : > qemu-launch.log
+
           qemu-system-x86_64 \
             -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
-            -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
-            -drive if=pflash,format=raw,file=/usr/share/OVMF/OVMF_VARS.fd \
+            -drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE \
+            -drive if=pflash,format=raw,file=ovmf-vars.fd \
             -chardev socket,id=chrtpm,path=/tmp/swtpm/sock \
             -tpmdev emulator,id=tpm0,chardev=chrtpm \
             -device tpm-crb,tpmdev=tpm0 \
@@ -217,9 +255,16 @@ jobs:
             -netdev user,id=n0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=n0 \
             -nographic -serial file:vm-serial.log \
-            -display none &
+            -display none \
+            > qemu-launch.log 2>&1 &
           echo $! > qemu.pid
           sleep 5
+          if ! kill -0 "$(cat qemu.pid)" 2>/dev/null; then
+            echo "QEMU exited during early boot"
+            tail -n 200 qemu-launch.log || true
+            tail -n 200 vm-serial.log || true
+            exit 1
+          fi
 
       - name: Wait for SSH (up to 5 min)
         run: |
@@ -231,10 +276,21 @@ jobs:
               echo "SSH up after ${i} attempt(s)"
               exit 0
             fi
+            if (( i == 1 || i % 6 == 0 )); then
+              echo "VM serial log excerpt (attempt ${i})"
+              tail -n 40 vm-serial.log || true
+            fi
+            if [[ -f qemu.pid ]] && ! kill -0 "$(cat qemu.pid)" 2>/dev/null; then
+              echo "QEMU exited before SSH came up"
+              tail -n 200 qemu-launch.log || true
+              tail -n 200 vm-serial.log || true
+              exit 1
+            fi
             sleep 10
           done
           echo "SSH never came up"
-          tail -n 200 vm-serial.log
+          tail -n 200 qemu-launch.log || true
+          tail -n 200 vm-serial.log || true
           exit 1
 
       - name: Verify system state in VM
@@ -275,10 +331,12 @@ jobs:
           sleep 5
           [[ -f qemu.pid ]] && kill -9 "$(cat qemu.pid)" 2>/dev/null || true
 
-      - name: Upload VM serial log on failure
+      - name: Upload VM logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: vm-serial-log
-          path: vm-serial.log
+          name: vm-logs
+          path: |
+            vm-serial.log
+            qemu-launch.log
           retention-days: 7
