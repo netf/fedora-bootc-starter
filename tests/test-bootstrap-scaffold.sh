@@ -73,7 +73,23 @@ test_common_library() {
     assert_file_contains "$path" "marker_write() { mkdir -p /var/lib/bootstrap && touch \"/var/lib/bootstrap/.\${1}.done\"; }"
 }
 
+test_sanity_script() {
+    local path="$REPO_ROOT/bootstrap/00-sanity.sh"
+
+    assert_file_contains "$path" "source /usr/share/bootstrap/lib/common.sh"
+    assert_file_contains "$path" "require_root"
+    assert_file_contains "$path" "[[ \"\${1:-}\" == \"--check\" ]] && exit 0"
+    assert_file_contains "$path" "log \"hostname: \$(hostname)\""
+    assert_file_contains "$path" "log \"kernel:   \$(uname -r)\""
+    assert_file_contains "$path" "for tool in systemd-cryptenroll cryptsetup fwupdmgr; do"
+    assert_file_contains "$path" "for tool in tpm2_pcrread ykman fprintd-enroll framework_tool; do"
+    assert_file_contains "$path" "if is_framework_laptop; then"
+    assert_file_contains "$path" "elif is_vm; then"
+    assert_file_contains "$path" "marker_write \"00-sanity\""
+}
+
 test_netf_bootstrap_service
 test_common_library
+test_sanity_script
 
 echo "PASS: bootstrap-scaffold"
