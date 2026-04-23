@@ -44,6 +44,7 @@ test_build_workflow() {
     assert_file_contains "$path" "uses: sigstore/cosign-installer@v3"
     assert_file_contains "$path" "config-ci-rendered.toml"
     assert_file_contains "$path" "uses: actions/upload-artifact@v4"
+    assert_file_contains "$path" "podman login --compat-auth-file \"\$HOME/.docker/config.json\""
     assert_file_contains "$path" "sbverify"
     assert_file_not_contains "$path" "sbctl"
     assert_file_contains "$path" "files/etc/containers/registries.d/"

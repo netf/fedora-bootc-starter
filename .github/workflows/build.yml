@@ -74,8 +74,12 @@ jobs:
 
       - name: Login to ghcr.io
         run: |
+          mkdir -p "$HOME/.docker"
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | podman login --compat-auth-file "$HOME/.docker/config.json" \
+                ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Verify cosign.pub is committed
         run: |
