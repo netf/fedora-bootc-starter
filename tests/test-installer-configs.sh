@@ -40,12 +40,25 @@ test_config_toml() {
     assert_file_contains "$path" "volume_id = \"FEDORA-BOOTC-STARTER\""
 }
 
+test_config_ci_toml() {
+    local path="$REPO_ROOT/config-ci.toml"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+    assert_toml_parses "$path"
+    assert_file_contains "$path" "[[customizations.user]]"
+    assert_file_contains "$path" "name = \"netf\""
+    assert_file_contains "$path" "name = \"root\""
+    assert_file_contains "$path" "key = \"{{CI_PUBKEY}}\""
+    assert_file_contains "$path" "[customizations.kernel]"
+    assert_file_contains "$path" "append = \"console=ttyS0,115200\""
+}
+
 run_tests() {
     local tests=("$@")
     local test_name
 
     if [[ ${#tests[@]} -eq 0 ]]; then
-        tests=(test_config_toml)
+        tests=(test_config_toml test_config_ci_toml)
     fi
 
     for test_name in "${tests[@]}"; do
