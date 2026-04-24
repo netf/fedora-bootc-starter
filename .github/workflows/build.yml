@@ -186,7 +186,8 @@ jobs:
           sudo apt-get install -y \
               qemu-system-x86 qemu-utils ovmf \
               swtpm swtpm-tools \
-              podman netcat-openbsd openssh-client
+              podman netcat-openbsd openssh-client \
+              xorriso
 
       - name: Locate OVMF firmware
         run: |
@@ -275,7 +276,94 @@ jobs:
               --ctrl type=unixio,path=/tmp/swtpm/sock \
               --log level=5 --daemon
 
-      - name: Boot VM (anaconda installs, then first encrypted boot)
+      - name: Extract anaconda kernel + initrd from ISO
+        run: |
+          ISO=$(ls output/bootiso/*.iso | head -1)
+          test -f "$ISO" || { echo "no installer iso produced"; exit 1; }
+          echo "Using installer ISO: $ISO"
+          echo "ISO=$ISO" >> "$GITHUB_ENV"
+
+          mkdir -p iso-extract
+          xorriso -osirrox on -indev "$ISO" -extract /images/pxeboot iso-extract/
+          test -f iso-extract/vmlinuz \
+            || { echo "vmlinuz not found in ISO /images/pxeboot"; ls -R iso-extract; exit 1; }
+          test -f iso-extract/initrd.img \
+            || { echo "initrd.img not found in ISO /images/pxeboot"; ls -R iso-extract; exit 1; }
+          ls -lh iso-extract/
+
+      - name: Run anaconda install (phase 1)
+        timeout-minutes: 25
+        run: |
+          # Fedora's anaconda ISO boots via GRUB with kernel args that don't
+          # redirect to serial, and this runner is headless — we'd have no
+          # visibility into anaconda. Instead, boot the ISO's kernel directly
+          # with our own cmdline (inst.text + console=ttyS0) and let anaconda
+          # locate its stage2 + embedded kickstart from the ISO attached as
+          # cdrom. -no-reboot makes QEMU exit on `reboot --eject` so we
+          # don't loop back into the installer.
+          : > anaconda-serial.log
+          : > anaconda-qemu.log
+          rm -f anaconda-serial.in anaconda-serial.out
+          mkfifo anaconda-serial.in anaconda-serial.out
+
+          tail -f anaconda-serial.out > anaconda-serial.log &
+          echo $! > anaconda-serial-tail.pid
+          tail -f /dev/null > anaconda-serial.in &
+          echo $! > anaconda-serial-stdin.pid
+
+          set +e
+          qemu-system-x86_64 \
+            -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
+            -chardev socket,id=chrtpm,path=/tmp/swtpm/sock \
+            -tpmdev emulator,id=tpm0,chardev=chrtpm \
+            -device tpm-crb,tpmdev=tpm0 \
+            -drive file=target.qcow2,if=virtio,format=qcow2 \
+            -drive file="$ISO",media=cdrom,if=ide,readonly=on \
+            -kernel iso-extract/vmlinuz \
+            -initrd iso-extract/initrd.img \
+            -append "console=ttyS0,115200 inst.text inst.stage2=hd:LABEL=FEDORA-BOOTC-STARTER inst.ks=cdrom" \
+            -netdev user,id=n0 \
+            -device virtio-net-pci,netdev=n0 \
+            -nographic -serial pipe:anaconda-serial \
+            -display none \
+            -no-reboot \
+            > anaconda-qemu.log 2>&1 &
+          ANACONDA_PID=$!
+          echo $ANACONDA_PID > anaconda-qemu.pid
+
+          # Poll serial log while QEMU runs; print progress at key milestones.
+          for i in $(seq 1 1500); do
+            if ! kill -0 "$ANACONDA_PID" 2>/dev/null; then
+              break
+            fi
+            case $i in
+              60|300|600|900|1200)
+                echo "--- anaconda serial tail (${i}s elapsed) ---"
+                tail -n 30 anaconda-serial.log || true
+                ;;
+            esac
+            sleep 1
+          done
+          wait "$ANACONDA_PID"
+          status=$?
+          set -e
+
+          [[ -f anaconda-serial-tail.pid ]] && kill -9 "$(cat anaconda-serial-tail.pid)" 2>/dev/null || true
+          [[ -f anaconda-serial-stdin.pid ]] && kill -9 "$(cat anaconda-serial-stdin.pid)" 2>/dev/null || true
+
+          echo "--- last 200 lines of anaconda serial log ---"
+          tail -n 200 anaconda-serial.log || true
+
+          # -no-reboot causes QEMU to exit with status 0 on guest reboot. Any
+          # non-zero exit indicates anaconda (or QEMU) failed.
+          if [[ $status -ne 0 ]]; then
+            echo "Phase 1 QEMU exited with status $status"
+            tail -n 200 anaconda-qemu.log || true
+            exit 1
+          fi
+          echo "Phase 1 complete: anaconda install finished."
+
+      - name: Boot installed system (phase 2, first encrypted boot)
         run: |
           cp "$OVMF_VARS_TEMPLATE" ovmf-vars.fd
           chmod u+w ovmf-vars.fd
@@ -290,10 +378,9 @@ jobs:
           tail -f /dev/null > vm-serial.in &
           echo $! > serial-stdin-holder.pid
 
-          ISO=$(ls output/bootiso/*.iso | head -1)
-          test -f "$ISO" || { echo "no installer iso produced"; exit 1; }
-          echo "Using installer ISO: $ISO"
-
+          # Phase 2 boots target.qcow2 via OVMF (real UEFI + measured boot).
+          # The installed kernel args include console=ttyS0 via
+          # EXTRA_KERNEL_APPEND so the first LUKS prompt appears on serial.
           qemu-system-x86_64 \
             -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
             -drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE \
@@ -302,8 +389,6 @@ jobs:
             -tpmdev emulator,id=tpm0,chardev=chrtpm \
             -device tpm-crb,tpmdev=tpm0 \
             -drive file=target.qcow2,if=virtio,format=qcow2 \
-            -drive file="$ISO",media=cdrom,if=ide,readonly=on \
-            -boot order=dc \
             -netdev user,id=n0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=n0 \
             -nographic -serial pipe:vm-serial \
@@ -318,14 +403,10 @@ jobs:
             exit 1
           fi
 
-      - name: Wait for anaconda install + first encrypted boot; inject passphrase
-        timeout-minutes: 30
+      - name: Wait for first encrypted boot; inject passphrase
+        timeout-minutes: 10
         run: |
-          # Anaconda installs the image into target.qcow2, then reboots via
-          # `reboot --eject`. The installed system boots with console=ttyS0
-          # from EXTRA_KERNEL_APPEND so the first LUKS prompt is on serial.
-          # Budget: ~5-10 min for install, plus reboot + initramfs to prompt.
-          for i in $(seq 1 1500); do
+          for i in $(seq 1 600); do
             if grep -qi 'Passphrase' vm-serial.log; then
               printf '%s\n' "$INSTALL_LUKS_PASSPHRASE" > vm-serial.in
               echo "sent LUKS passphrase over serial (after ${i}s)"
@@ -338,7 +419,7 @@ jobs:
               exit 1
             fi
             case $i in
-              60|300|600|900|1200)
+              60|300)
                 echo "Still waiting for LUKS prompt (${i}s elapsed)"
                 tail -n 30 vm-serial.log || true
                 ;;
@@ -459,4 +540,6 @@ jobs:
           path: |
             vm-serial.log
             qemu-launch.log
+            anaconda-serial.log
+            anaconda-qemu.log
           retention-days: 7
