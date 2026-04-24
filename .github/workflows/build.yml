@@ -380,6 +380,39 @@ jobs:
           echo "sbverify available"
           $ROOT_SSH 'sbverify --help >/dev/null'
 
+          echo "LUKS enrollment state"
+          $ROOT_SSH "set -e; \
+            MAPPER=\$(findmnt -no SOURCE / | sed 's,.*/,,'); \
+            DEV=\$(cryptsetup status \"\$MAPPER\" | awk '/device:/ {print \$2}'); \
+            cryptsetup luksDump \"\$DEV\" > /tmp/luks.dump; \
+            grep -q systemd-tpm2 /tmp/luks.dump; \
+            grep -q systemd-recovery /tmp/luks.dump; \
+            ! grep -qE '^\\s*0:\\s+luks2' /tmp/luks.dump; \
+            echo 'installer keyslot 0 removed'"
+
+          echo "Rebooting for second boot - no passphrase injection"
+          $ROOT_SSH 'systemctl reboot' || true
+          sleep 10
+          for i in {1..30}; do
+            if $USER_SSH true 2>/dev/null; then
+              echo "SSH up on second boot after ${i} attempt(s)"
+              break
+            fi
+            if [[ -f qemu.pid ]] && ! kill -0 "$(cat qemu.pid)" 2>/dev/null; then
+              echo "QEMU exited before second boot SSH came up"
+              tail -n 200 qemu-launch.log || true
+              tail -n 200 vm-serial.log || true
+              exit 1
+            fi
+            if [[ $i -eq 30 ]]; then
+              echo "SSH never came up on second boot"
+              tail -n 200 qemu-launch.log || true
+              tail -n 200 vm-serial.log || true
+              exit 1
+            fi
+            sleep 10
+          done
+
           echo "Hardware-gated scripts skip gracefully"
           $ROOT_SSH '/usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
           $ROOT_SSH '/usr/share/bootstrap/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
