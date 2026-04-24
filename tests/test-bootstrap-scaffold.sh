@@ -32,6 +32,13 @@ EOF
 test_profile_layout() {
     [[ -d "$REPO_ROOT/bootstrap/core" ]] || fail "missing directory: $REPO_ROOT/bootstrap/core"
     [[ -d "$REPO_ROOT/bootstrap/hardware" ]] || fail "missing directory: $REPO_ROOT/bootstrap/hardware"
+
+    # Numbered scripts live under core/ or hardware/; no top-level shims.
+    local shim
+    for shim in "$REPO_ROOT"/bootstrap/[0-9]*.sh; do
+        [[ -e "$shim" ]] && fail "shim reintroduced: $shim (move content into core/ or hardware/)"
+    done
+    return 0
 }
 
 test_common_library() {

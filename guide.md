@@ -425,7 +425,7 @@ has_token() {
 }
 ```
 
-### `bootstrap/00-sanity.sh`
+### `bootstrap/core/00-sanity.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -471,7 +471,7 @@ fi
 marker_write "00-sanity"
 ```
 
-### `bootstrap/05-firmware-update.sh`
+### `bootstrap/core/05-firmware-update.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -509,7 +509,7 @@ fwupdmgr update -y --no-reboot-check || warn "some updates deferred to next boot
 marker_write "05-firmware"
 ```
 
-### `bootstrap/10-luks-tpm2.sh`
+### `bootstrap/core/10-luks-tpm2.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -566,7 +566,7 @@ ok "TPM2 enrolled"
 marker_write "10-tpm2"
 ```
 
-### `bootstrap/11-luks-fido2.sh`
+### `bootstrap/hardware/11-luks-fido2.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -613,7 +613,7 @@ ok "FIDO2 enrolled"
 marker_write "11-fido2"
 ```
 
-### `bootstrap/12-luks-recovery.sh`
+### `bootstrap/core/12-luks-recovery.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -666,7 +666,7 @@ ok "Recovery key enrolled"
 marker_write "12-recovery"
 ```
 
-### `bootstrap/13-luks-wipe-installer.sh`
+### `bootstrap/core/13-luks-wipe-installer.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -711,7 +711,7 @@ ok "Installer passphrase wiped. Unlock is now TPM2 (auto) / YubiKey / recovery k
 marker_write "13-wipe"
 ```
 
-### `bootstrap/30-fingerprint-enroll.sh`
+### `bootstrap/hardware/30-fingerprint-enroll.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -746,7 +746,7 @@ ok "Fingerprint enrolled"
 marker_write "30-fprint"
 ```
 
-### `bootstrap/40-framework-ec.sh`
+### `bootstrap/hardware/40-framework-ec.sh`
 
 ```bash
 #!/usr/bin/env bash
@@ -1168,13 +1168,13 @@ jobs:
 
           echo "─── Hardware-gated scripts skip gracefully ───"
           # Framework EC: should skip (VM is not Framework)
-          $ROOT_SSH '/usr/share/bootstrap/40-framework-ec.sh --check 2>&1' | grep -i 'skip\|not a framework'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/40-framework-ec.sh --check 2>&1' | grep -i 'skip\|not a framework'
           # Fingerprint: should skip (no Goodix device)
-          $ROOT_SSH '/usr/share/bootstrap/30-fingerprint-enroll.sh --check 2>&1' | grep -i 'skip\|no fingerprint'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/30-fingerprint-enroll.sh --check 2>&1' | grep -i 'skip\|no fingerprint'
           # FIDO2: should skip (no YubiKey)
-          $ROOT_SSH '/usr/share/bootstrap/11-luks-fido2.sh --check 2>&1' | grep -i 'skip\|no yubikey\|not luks'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/11-luks-fido2.sh --check 2>&1' | grep -i 'skip\|no yubikey\|not luks'
           # Firmware: should skip in VM
-          $ROOT_SSH '/usr/share/bootstrap/05-firmware-update.sh --check 2>&1' | grep -i 'skip\|vm'
+          $ROOT_SSH '/usr/share/bootstrap/core/05-firmware-update.sh --check 2>&1' | grep -i 'skip\|vm'
 
           echo "─── run-all.sh --check terminates cleanly ───"
           $ROOT_SSH '/usr/share/bootstrap/run-all.sh --check; echo "exit: $?"'

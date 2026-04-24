@@ -39,8 +39,8 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y shellcheck
-          shellcheck -x bootstrap/*.sh bootstrap/lib/*.sh scripts/*.sh
-          for f in bootstrap/*.sh bootstrap/lib/*.sh scripts/*.sh; do
+          shellcheck -x bootstrap/*.sh bootstrap/core/*.sh bootstrap/hardware/*.sh bootstrap/lib/*.sh scripts/*.sh
+          for f in bootstrap/*.sh bootstrap/core/*.sh bootstrap/hardware/*.sh bootstrap/lib/*.sh scripts/*.sh; do
             bash -n "$f"
           done
 
@@ -440,10 +440,10 @@ jobs:
           done
 
           echo "Hardware-gated scripts skip gracefully"
-          $ROOT_SSH '/usr/share/bootstrap/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
-          $ROOT_SSH '/usr/share/bootstrap/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
-          $ROOT_SSH '/usr/share/bootstrap/11-luks-fido2.sh --check' 2>&1 | grep -i 'skip\|no yubikey\|not luks\|n/a'
-          $ROOT_SSH '/usr/share/bootstrap/05-firmware-update.sh --check' 2>&1 | grep -i 'skip\|vm'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/40-framework-ec.sh --check' 2>&1 | grep -i 'skip\|not a framework'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/30-fingerprint-enroll.sh --check' 2>&1 | grep -i 'skip\|no fingerprint'
+          $ROOT_SSH '/usr/share/bootstrap/hardware/11-luks-fido2.sh --check' 2>&1 | grep -i 'skip\|no yubikey\|not luks\|n/a'
+          $ROOT_SSH '/usr/share/bootstrap/core/05-firmware-update.sh --check' 2>&1 | grep -i 'skip\|vm'
 
           echo "run-all.sh --check terminates 0"
           $ROOT_SSH '/usr/share/bootstrap/run-all.sh --check'

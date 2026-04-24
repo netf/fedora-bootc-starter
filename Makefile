@@ -16,7 +16,7 @@ help:  ## Show this help
 
 lint:  ## Lint Containerfile, shell scripts, and YAML
 	hadolint Containerfile
-	shellcheck -x bootstrap/*.sh bootstrap/lib/*.sh scripts/*.sh
+	shellcheck -x bootstrap/*.sh bootstrap/core/*.sh bootstrap/hardware/*.sh bootstrap/lib/*.sh scripts/*.sh
 	yamllint .github/workflows/ files/etc/containers/registries.d/
 	@echo "lint clean"
 
