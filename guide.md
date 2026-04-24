@@ -308,11 +308,9 @@ firstboot --disable
 reboot --eject
 """
 
-# User creation happens above, so disable Anaconda's users module
-[customizations.installer.modules]
-disable = ["org.fedoraproject.Anaconda.Modules.Users"]
+# SSH keys for users defined in the kickstart above.
+{{EXTRA_SSHKEY_LINES}}
 
-{{EXTRA_USER_BLOCKS}}
 [customizations.kernel]
 append = "{{EXTRA_KERNEL_APPEND}}"
 
@@ -1080,18 +1078,10 @@ jobs:
       - name: Render encrypted installer config
         run: |
           pubkey="$(cat ci-key.pub)"
-          EXTRA_USER_BLOCKS="$(cat <<EOF
-          [[customizations.user]]
-          name = "netf"
-          groups = ["wheel"]
-          key = "$pubkey"
-
-          [[customizations.user]]
-          name = "root"
-          key = "$pubkey"
-          EOF
-          )"
-          export EXTRA_USER_BLOCKS
+          EXTRA_SSHKEY_LINES="$(printf '%s\n' \
+            "sshkey --username=netf \"$pubkey\"" \
+            "sshkey --username=root \"$pubkey\"")"
+          export EXTRA_SSHKEY_LINES
           ./scripts/render-installer-config.sh > config-ci-rendered.toml
           python3 -c "import tomllib; tomllib.load(open('config-ci-rendered.toml','rb'))"
 

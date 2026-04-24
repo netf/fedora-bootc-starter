@@ -47,10 +47,7 @@ rendered = template_path.read_text()
 replacements = {
     "{{INSTALL_LUKS_PASSPHRASE}}": "fixture-passphrase",
     "{{ADMIN_PASSWORD_HASH}}": "$6$fixture$hashed-admin-password",
-    "{{EXTRA_USER_BLOCKS}}": """[[customizations.user]]
-name = "root"
-key = "ssh-ed25519 AAAATEST fixture-root"
-""",
+    "{{EXTRA_SSHKEY_LINES}}": 'sshkey --username=root "ssh-ed25519 AAAATEST fixture-root"',
     "{{EXTRA_KERNEL_APPEND}}": "console=ttyS0,115200 rd.debug",
 }
 
@@ -69,19 +66,20 @@ test_config_toml_template() {
     assert_file_missing "$REPO_ROOT/config-ci.toml"
     [[ -f "$path" ]] || fail "missing file: $path"
     assert_file_contains "$path" "{{INSTALL_LUKS_PASSPHRASE}}"
-    assert_file_contains "$path" "{{EXTRA_USER_BLOCKS}}"
+    assert_file_contains "$path" "{{ADMIN_PASSWORD_HASH}}"
+    assert_file_contains "$path" "{{EXTRA_SSHKEY_LINES}}"
     assert_file_contains "$path" "{{EXTRA_KERNEL_APPEND}}"
     assert_file_not_contains "$path" "installer-temp-change-me"
-    # User creation lives in blueprint customizations, not kickstart content.
-    assert_file_not_contains "$path" "user --name=netf"
-    assert_file_not_contains "$path" "rootpw --lock"
+    # Users and SSH keys live inside the kickstart; no blueprint user blocks.
+    assert_file_not_contains "$path" "[[customizations.user]]"
 
     rendered_path="$(mktemp)"
     render_template_fixture "$path" "$rendered_path"
     assert_toml_parses "$rendered_path"
     assert_file_contains "$rendered_path" "[customizations.installer.kickstart]"
     assert_file_contains "$rendered_path" "part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=fixture-passphrase"
-    assert_file_contains "$rendered_path" "[[customizations.user]]"
+    assert_file_contains "$rendered_path" "user --name=netf --groups=wheel --iscrypted --password='\$6\$fixture\$hashed-admin-password'"
+    assert_file_contains "$rendered_path" "sshkey --username=root"
 }
 
 test_render_installer_config_script() {
@@ -97,16 +95,29 @@ test_render_installer_config_script() {
     expected_kernel_append=$'console=ttyS0,115200 rd.debug rd.break="pre-mount" path=C:\\temp\\logs'
     INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
     ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
-    EXTRA_USER_BLOCKS=$'[[customizations.user]]\nname = "root"\nkey = "ssh-ed25519 AAAATEST rendered-root ci-{fixture}"\n' \
+    EXTRA_SSHKEY_LINES=$'sshkey --username=root "ssh-ed25519 AAAATEST rendered-root ci-{fixture}"' \
     EXTRA_KERNEL_APPEND="$expected_kernel_append" \
     "$script_path" >"$rendered_path"
 
     assert_toml_parses "$rendered_path"
     assert_file_contains "$rendered_path" "[customizations.installer.kickstart]"
     assert_file_contains "$rendered_path" "part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=rendered-passphrase"
-    assert_file_contains "$rendered_path" "[[customizations.user]]"
+    assert_file_contains "$rendered_path" "user --name=netf --groups=wheel --iscrypted --password='\$6\$fixture\$hashed-admin-password'"
+    assert_file_contains "$rendered_path" "sshkey --username=root"
     assert_file_contains "$rendered_path" "[customizations.kernel]"
     assert_kernel_append_equals "$rendered_path" "$expected_kernel_append"
+}
+
+test_render_installer_config_script_rejects_unsafe_sshkey_lines() {
+    local script_path="$REPO_ROOT/scripts/render-installer-config.sh"
+
+    assert_command_fails_contains "EXTRA_SSHKEY_LINES entries must start with" \
+        env \
+        INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
+        ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
+        EXTRA_SSHKEY_LINES='reboot' \
+        EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
+        "$script_path"
 }
 
 test_render_installer_config_script_rejects_unsafe_passphrase() {
@@ -117,7 +128,7 @@ test_render_installer_config_script_rejects_unsafe_passphrase() {
         env \
         INSTALL_LUKS_PASSPHRASE="rendered passphrase" \
         ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
-        EXTRA_USER_BLOCKS="" \
+        EXTRA_SSHKEY_LINES="" \
         EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
         "$script_path"
 
@@ -125,7 +136,7 @@ test_render_installer_config_script_rejects_unsafe_passphrase() {
         env \
         INSTALL_LUKS_PASSPHRASE='rendered"passphrase' \
         ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
-        EXTRA_USER_BLOCKS="" \
+        EXTRA_SSHKEY_LINES="" \
         EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
         "$script_path"
 }
@@ -138,7 +149,7 @@ test_render_installer_config_script_rejects_multiline_kernel_append() {
         env \
         INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
         ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
-        EXTRA_USER_BLOCKS="" \
+        EXTRA_SSHKEY_LINES="" \
         EXTRA_KERNEL_APPEND=$'console=ttyS0\nrd.debug' \
         "$script_path"
 }
@@ -162,7 +173,7 @@ test_render_installer_config_script_rejects_unknown_leftover_placeholders() {
             env \
             INSTALL_LUKS_PASSPHRASE="rendered-passphrase" \
             ADMIN_PASSWORD_HASH="\$6\$fixture\$hashed-admin-password" \
-            EXTRA_USER_BLOCKS="" \
+            EXTRA_SSHKEY_LINES="" \
             EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
             "$script_path"
     )
@@ -172,7 +183,7 @@ test_guide_documents_rendered_installer_template() {
     local path="$REPO_ROOT/guide.md"
 
     [[ -f "$path" ]] || fail "missing file: $path"
-    assert_file_contains "$path" "{{EXTRA_USER_BLOCKS}}"
+    assert_file_contains "$path" "{{EXTRA_SSHKEY_LINES}}"
     assert_file_contains "$path" 'volume_id = "FEDORA-BOOTC-STARTER"'
     assert_file_contains "$path" "openssl passwd -6 'your-pw'"
     assert_file_contains "$path" "export INSTALL_LUKS_PASSPHRASE='temporary-luks-passphrase'"
@@ -189,6 +200,7 @@ run_tests() {
             test_config_toml_template
             test_render_installer_config_script
             test_render_installer_config_script_rejects_unsafe_passphrase
+            test_render_installer_config_script_rejects_unsafe_sshkey_lines
             test_render_installer_config_script_rejects_multiline_kernel_append
             test_render_installer_config_script_rejects_unknown_leftover_placeholders
             test_guide_documents_rendered_installer_template

@@ -1,10 +1,8 @@
 # Authoritative installer template for bootc-image-builder.
 # Render with scripts/render-installer-config.sh before use.
 #
-# The kickstart intentionally contains no "user" or "rootpw" directives —
-# bib rejects mixing kickstart user content with blueprint user
-# customizations. User creation is driven by the rendered user blocks
-# placeholder below (blueprint customizations).
+# All user/key provisioning happens inside the kickstart — bib rejects
+# mixing blueprint customizations.user with user-supplied kickstart content.
 
 [customizations.installer.kickstart]
 contents = """
@@ -20,12 +18,14 @@ clearpart --all --initlabel --disklabel=gpt
 reqpart --add-boot
 part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase={{INSTALL_LUKS_PASSPHRASE}}
 
+rootpw --lock
+user --name=netf --groups=wheel --iscrypted --password='{{ADMIN_PASSWORD_HASH}}'
+{{EXTRA_SSHKEY_LINES}}
 services --enabled=sshd,tailscaled
 firstboot --disable
 reboot --eject
 """
 
-{{EXTRA_USER_BLOCKS}}
 [customizations.kernel]
 append = "{{EXTRA_KERNEL_APPEND}}"
 

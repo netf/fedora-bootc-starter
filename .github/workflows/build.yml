@@ -54,7 +54,6 @@ jobs:
           RENDERED_CONFIG="$(mktemp)"
           INSTALL_LUKS_PASSPHRASE="fixture-passphrase" \
           ADMIN_PASSWORD_HASH='$6$fixture$hashed-admin-password' \
-          EXTRA_USER_BLOCKS="" \
           EXTRA_KERNEL_APPEND="console=ttyS0,115200 rd.debug" \
             ./scripts/render-installer-config.sh > "$RENDERED_CONFIG"
           python3 -c "import tomllib; tomllib.load(open('$RENDERED_CONFIG','rb'))"
@@ -244,18 +243,10 @@ jobs:
       - name: Render encrypted installer config
         run: |
           pubkey="$(cat ci-key.pub)"
-          EXTRA_USER_BLOCKS="$(cat <<EOF
-          [[customizations.user]]
-          name = "netf"
-          groups = ["wheel"]
-          key = "$pubkey"
-
-          [[customizations.user]]
-          name = "root"
-          key = "$pubkey"
-          EOF
-          )"
-          export EXTRA_USER_BLOCKS
+          EXTRA_SSHKEY_LINES="$(printf '%s\n' \
+            "sshkey --username=netf \"$pubkey\"" \
+            "sshkey --username=root \"$pubkey\"")"
+          export EXTRA_SSHKEY_LINES
           ./scripts/render-installer-config.sh > config-ci-rendered.toml
           python3 -c "import tomllib; tomllib.load(open('config-ci-rendered.toml','rb'))"
 

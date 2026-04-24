@@ -5,7 +5,7 @@ BUILDER_IMG    := quay.io/centos-bootc/bootc-image-builder:latest
 OUTPUT_DIR     := output
 export INSTALL_LUKS_PASSPHRASE ?=
 export ADMIN_PASSWORD_HASH ?= $$6$$YdvxSXl6YUHhOzEf$$YTvt9PEWKWpTVcb.Y4N/Qlwp.cpMmQbegc8OIFsturFPjOtuYWw4Uzwy5dHlwNiqqiaMd9mfUlJH6wn.EA1Wo0
-export EXTRA_USER_BLOCKS ?=
+export EXTRA_SSHKEY_LINES ?=
 export EXTRA_KERNEL_APPEND ?=
 
 .DEFAULT_GOAL := help

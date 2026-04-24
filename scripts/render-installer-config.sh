@@ -7,8 +7,9 @@ TEMPLATE_PATH="$REPO_ROOT/config.toml.in"
 
 : "${INSTALL_LUKS_PASSPHRASE:?INSTALL_LUKS_PASSPHRASE is required}"
 : "${ADMIN_PASSWORD_HASH:?ADMIN_PASSWORD_HASH is required}"
-: "${EXTRA_USER_BLOCKS?EXTRA_USER_BLOCKS must be set}"
+: "${EXTRA_SSHKEY_LINES=}"
 : "${EXTRA_KERNEL_APPEND?EXTRA_KERNEL_APPEND must be set}"
+export EXTRA_SSHKEY_LINES
 
 [[ -f "$TEMPLATE_PATH" ]] || {
     echo "ERROR: missing template: $TEMPLATE_PATH" >&2
@@ -47,25 +48,25 @@ def escape_toml_basic_string(value: str) -> str:
         fail("EXTRA_KERNEL_APPEND must not contain control characters")
     return json.dumps(value)[1:-1]
 
-def default_user_block(password_hash: str) -> str:
-    if not password_hash:
-        fail("ADMIN_PASSWORD_HASH must be set when EXTRA_USER_BLOCKS is empty")
-    escaped_hash = escape_toml_basic_string(password_hash)
-    return (
-        "[[customizations.user]]\n"
-        'name = "netf"\n'
-        'groups = ["wheel"]\n'
-        f'password = "{escaped_hash}"\n'
-    )
+def validate_sshkey_lines(value: str) -> str:
+    # Each non-empty line must start with `sshkey --username=` so we can't
+    # accidentally inject unrelated kickstart directives (reboot, clearpart, ...).
+    for line in value.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not stripped.startswith("sshkey --username="):
+            fail(
+                'EXTRA_SSHKEY_LINES entries must start with `sshkey --username=`; '
+                f"got: {stripped!r}"
+            )
+    return value
 
-
-user_blocks = os.environ["EXTRA_USER_BLOCKS"]
-if not user_blocks.strip():
-    user_blocks = default_user_block(os.environ["ADMIN_PASSWORD_HASH"])
 
 replacements = {
     "{{INSTALL_LUKS_PASSPHRASE}}": validate_passphrase(os.environ["INSTALL_LUKS_PASSPHRASE"]),
-    "{{EXTRA_USER_BLOCKS}}": user_blocks,
+    "{{ADMIN_PASSWORD_HASH}}": os.environ["ADMIN_PASSWORD_HASH"],
+    "{{EXTRA_SSHKEY_LINES}}": validate_sshkey_lines(os.environ.get("EXTRA_SSHKEY_LINES", "")),
     "{{EXTRA_KERNEL_APPEND}}": escape_toml_basic_string(os.environ["EXTRA_KERNEL_APPEND"]),
 }
 
