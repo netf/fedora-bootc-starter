@@ -171,7 +171,7 @@ jobs:
   e2e-vm:
     needs: lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -259,7 +259,7 @@ jobs:
           ./scripts/render-installer-config.sh > config-ci-rendered.toml
           python3 -c "import tomllib; tomllib.load(open('config-ci-rendered.toml','rb'))"
 
-      - name: Build qcow2
+      - name: Build installer ISO
         run: |
           mkdir -p output
           sudo podman run --rm --privileged --pull=newer \
@@ -269,10 +269,13 @@ jobs:
               -v $PWD/output:/output \
               quay.io/centos-bootc/bootc-image-builder:latest \
               --progress verbose \
-              --type qcow2 --rootfs btrfs --config /config.toml \
+              --type anaconda-iso --rootfs btrfs --config /config.toml \
               localhost/test-image:ci
           sudo chown -R "$USER" output
-          ls -lh output/qcow2/
+          ls -lh output/bootiso/
+
+      - name: Create blank target disk
+        run: qemu-img create -f qcow2 target.qcow2 25G
 
       - name: Start swtpm (emulated TPM2)
         run: |
@@ -281,7 +284,7 @@ jobs:
               --ctrl type=unixio,path=/tmp/swtpm/sock \
               --log level=5 --daemon
 
-      - name: Boot VM in background
+      - name: Boot VM (anaconda installs, then first encrypted boot)
         run: |
           cp "$OVMF_VARS_TEMPLATE" ovmf-vars.fd
           chmod u+w ovmf-vars.fd
@@ -296,6 +299,10 @@ jobs:
           tail -f /dev/null > vm-serial.in &
           echo $! > serial-stdin-holder.pid
 
+          ISO=$(ls output/bootiso/*.iso | head -1)
+          test -f "$ISO" || { echo "no installer iso produced"; exit 1; }
+          echo "Using installer ISO: $ISO"
+
           qemu-system-x86_64 \
             -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
             -drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE \
@@ -303,7 +310,9 @@ jobs:
             -chardev socket,id=chrtpm,path=/tmp/swtpm/sock \
             -tpmdev emulator,id=tpm0,chardev=chrtpm \
             -device tpm-crb,tpmdev=tpm0 \
-            -drive file=output/qcow2/disk.qcow2,if=virtio,format=qcow2 \
+            -drive file=target.qcow2,if=virtio,format=qcow2 \
+            -drive file="$ISO",media=cdrom,if=ide,readonly=on \
+            -boot order=dc \
             -netdev user,id=n0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=n0 \
             -nographic -serial pipe:vm-serial \
@@ -318,25 +327,36 @@ jobs:
             exit 1
           fi
 
-      - name: Unlock first encrypted boot over serial
+      - name: Wait for anaconda install + first encrypted boot; inject passphrase
+        timeout-minutes: 30
         run: |
-          for i in {1..120}; do
+          # Anaconda installs the image into target.qcow2, then reboots via
+          # `reboot --eject`. The installed system boots with console=ttyS0
+          # from EXTRA_KERNEL_APPEND so the first LUKS prompt is on serial.
+          # Budget: ~5-10 min for install, plus reboot + initramfs to prompt.
+          for i in $(seq 1 1500); do
             if grep -qi 'Passphrase' vm-serial.log; then
               printf '%s\n' "$INSTALL_LUKS_PASSPHRASE" > vm-serial.in
-              echo "sent LUKS passphrase over serial"
+              echo "sent LUKS passphrase over serial (after ${i}s)"
               exit 0
             fi
             if [[ -f qemu.pid ]] && ! kill -0 "$(cat qemu.pid)" 2>/dev/null; then
               echo "QEMU exited before LUKS passphrase prompt"
               tail -n 200 qemu-launch.log || true
-              tail -n 200 vm-serial.log || true
+              tail -n 400 vm-serial.log || true
               exit 1
             fi
+            case $i in
+              60|300|600|900|1200)
+                echo "Still waiting for LUKS prompt (${i}s elapsed)"
+                tail -n 30 vm-serial.log || true
+                ;;
+            esac
             sleep 1
           done
           echo "LUKS passphrase prompt never appeared"
           tail -n 200 qemu-launch.log || true
-          tail -n 200 vm-serial.log || true
+          tail -n 400 vm-serial.log || true
           exit 1
 
       - name: Wait for SSH (up to 5 min)
