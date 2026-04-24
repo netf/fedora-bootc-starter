@@ -1,5 +1,11 @@
 # fedora-bootc-starter — design spec
 
+> **Status:** historical design reference. The current contract is defined by
+> `docs/plans/2026-04-23-fedora-bootc-production-like-design.md` and
+> `docs/plans/2026-04-23-fedora-bootc-production-like-implementation.md`:
+> rendered encrypted installer config, automatic `core` bootstrap only, explicit
+> `hardware` post-install profile, and second-boot TPM2 auto-unlock proof in CI.
+
 **Date:** 2026-04-23
 **Repo:** github.com/netf/fedora-bootc-starter
 **Image:** `ghcr.io/netf/fedora-bootc-starter:${FEDORA_VERSION}` (default `44`)

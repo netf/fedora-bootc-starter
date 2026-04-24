@@ -2,6 +2,20 @@
 
 Unattended, single-USB install of a custom Fedora Kinoite 44 image for the **Framework Laptop 13 Pro** (Intel Core Ultra Series 3 / Panther Lake). The container image is the source of truth; a kickstart-backed installer ISO handles partitioning + LUKS2, and first-boot scripts enroll TPM2 / FIDO2 / YubiKey as additional LUKS keyslots, apply firmware updates via LVFS, and set a sane battery charge limit via Framework's embedded controller.
 
+## Current production contract
+
+The production path is centered on one rendered installer template:
+
+- install-time encrypted root with LUKS2 on btrfs
+- one-time first-boot passphrase entry for the temporary installer key
+- automatic core bootstrap via `netf-bootstrap.service` -> `/usr/share/bootstrap/run-profile.sh core`
+- core bootstrap owns TPM2 enrollment, recovery enrollment, installer-key removal, initramfs regeneration, and reboot-required signaling
+- explicit hardware post-install profile via `sudo /usr/share/bootstrap/run-profile.sh hardware`
+- hardware profile owns YubiKey/FIDO2, fingerprint, and Framework EC tuning
+- CI renders the same encrypted installer config, unlocks first boot once over serial, then requires second-boot TPM2 auto-unlock proof
+
+Some older implementation notes below still show historical snippets. Treat this section, `README.md`, and `docs/plans/2026-04-23-fedora-bootc-production-like-design.md` as the current contract.
+
 ## What you get
 
 - A signed bootc image at `ghcr.io/netf/kinoite-fw13:44` that you rebase onto and update with `bootc upgrade`.

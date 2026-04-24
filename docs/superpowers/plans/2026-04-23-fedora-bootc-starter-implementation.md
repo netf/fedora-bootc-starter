@@ -1,5 +1,12 @@
 # fedora-bootc-starter Implementation Plan
 
+> **Status:** historical implementation plan. The current implementation plan is
+> `docs/plans/2026-04-23-fedora-bootc-production-like-implementation.md`, paired
+> with `docs/plans/2026-04-23-fedora-bootc-production-like-design.md`. The active
+> contract uses a rendered encrypted installer config, automatic `core` bootstrap,
+> explicit `hardware` post-install profile, and second-boot TPM2 auto-unlock proof
+> in CI.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship a signed, CI-tested Fedora Kinoite bootc image for Framework Laptop 13 Pro, with unattended installer ISO and idempotent first-boot bootstrap.

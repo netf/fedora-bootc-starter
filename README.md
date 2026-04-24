@@ -4,6 +4,8 @@ Signed Fedora Kinoite bootc image + unattended installer for the Framework Lapto
 
 Companion to [netf/dotfiles](https://github.com/netf/dotfiles). This image is the minimum host foundation; everything user-facing (flatpaks, dev languages, toolbox, modern CLI) lives in dotfiles.
 
+Current contract: install-time encrypted root with LUKS2 on btrfs, one-time first-boot passphrase entry, automatic core bootstrap for TPM2/recovery/installer-key cleanup, explicit hardware post-install profile for YubiKey/fingerprint/Framework EC, and second-boot TPM2 auto-unlock proof in CI.
+
 ## Image
 
 ```text
@@ -39,9 +41,11 @@ On the Framework 13 Pro:
 
 1. BIOS: confirm Intel PTT (TPM2) on, Secure Boot on.
 2. Boot the USB from the F12 boot menu. The install is unattended and should finish in about five minutes without network access.
-3. Reboot and enter the throwaway installer passphrase once.
-4. `netf-bootstrap.service` runs on first login: LVFS firmware -> TPM2 -> FIDO2 -> recovery key -> wipe installer password -> fingerprint -> EC charge limit.
-5. The `motd` prints the dotfiles handoff: `curl -fsLS https://raw.githubusercontent.com/netf/dotfiles/main/install.sh | bash`.
+3. Reboot and enter the temporary installer passphrase once.
+4. `netf-bootstrap.service` runs the automatic core bootstrap: sanity checks, VM-safe firmware handling, TPM2 enrollment, recovery enrollment, installer-key removal, initramfs regeneration, and reboot-required signaling.
+5. Reboot again. TPM2 auto-unlock should bring the system up without another LUKS passphrase prompt.
+6. Run the explicit hardware post-install profile when the real laptop is present: `sudo /usr/share/bootstrap/run-profile.sh hardware`.
+7. The `motd` prints the dotfiles handoff: `curl -fsLS https://raw.githubusercontent.com/netf/dotfiles/main/install.sh | bash`.
 
 ## Day 2
 
@@ -53,6 +57,8 @@ bootc rollback
 systemctl reboot
 
 sudo /usr/share/bootstrap/run-all.sh --check
+sudo /usr/share/bootstrap/run-profile.sh core --check
+sudo /usr/share/bootstrap/run-profile.sh hardware --check
 ```
 
 After a kernel update, PCR 11 changes. Re-bind TPM2:
@@ -107,7 +113,7 @@ CI matrix:
 | --- | --- | --- |
 | `lint` | every PR + push | hadolint, shellcheck, bash -n, yamllint, TOML parse |
 | `build` | main + nightly + dispatch | `podman build`, `bootc container lint`, smoke tests, initramfs contents, negative assertions. On main: push and cosign sign the digest. |
-| `e2e-vm` | main + nightly | qcow2 via bootc-image-builder, boot in QEMU with swtpm, SSH in, verify TPM2, run bootstrap `--check`, verify hardware gates skip. |
+| `e2e-vm` | main + nightly | qcow2 via bootc-image-builder using the rendered encrypted installer config, first boot unlocked once over serial, verify TPM2 + recovery + installer-slot removal, reboot, second-boot TPM2 auto-unlock proof, verify hardware gates skip. |
 
 Manual-only checks on real Framework 13 Pro hardware:
 
