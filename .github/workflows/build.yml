@@ -111,12 +111,17 @@ jobs:
           sudo podman run --rm $IMAGE_REF bash -c '
             set -e
 
+            test -x /usr/share/bootstrap/run-profile.sh
             test -x /usr/share/bootstrap/run-all.sh
-            for s in 00-sanity 05-firmware-update 10-luks-tpm2 11-luks-fido2 \
-                     12-luks-recovery 13-luks-wipe-installer 30-fingerprint-enroll \
-                     40-framework-ec; do
-              test -x /usr/share/bootstrap/$s.sh
-              bash -n /usr/share/bootstrap/$s.sh
+            test -x /usr/share/bootstrap/core/10-luks-tpm2.sh
+            test -x /usr/share/bootstrap/core/13-luks-wipe-installer.sh
+            test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh
+            test -x /usr/share/bootstrap/hardware/30-fingerprint-enroll.sh
+            grep -q '^ExecStart=/usr/share/bootstrap/run-profile.sh core$' /usr/lib/systemd/system/netf-bootstrap.service
+            for s in /usr/share/bootstrap/core/[0-9]*.sh \
+                     /usr/share/bootstrap/hardware/[0-9]*.sh; do
+              test -x "$s"
+              bash -n "$s"
             done
             test -f /usr/share/bootstrap/lib/common.sh
 
@@ -143,7 +148,8 @@ jobs:
             ! command -v starship
 
             KVER=$(ls /usr/lib/modules | head -1)
-            lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -qE "tpm2|cryptsetup"
+            lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q cryptsetup
+            lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q tpm2
             lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q ostree
 
             echo "smoke tests pass"
