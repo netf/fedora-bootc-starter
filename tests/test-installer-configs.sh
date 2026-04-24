@@ -69,10 +69,12 @@ test_config_toml_template() {
     assert_file_missing "$REPO_ROOT/config-ci.toml"
     [[ -f "$path" ]] || fail "missing file: $path"
     assert_file_contains "$path" "{{INSTALL_LUKS_PASSPHRASE}}"
-    assert_file_contains "$path" "{{ADMIN_PASSWORD_HASH}}"
     assert_file_contains "$path" "{{EXTRA_USER_BLOCKS}}"
     assert_file_contains "$path" "{{EXTRA_KERNEL_APPEND}}"
     assert_file_not_contains "$path" "installer-temp-change-me"
+    # User creation lives in blueprint customizations, not kickstart content.
+    assert_file_not_contains "$path" "user --name=netf"
+    assert_file_not_contains "$path" "rootpw --lock"
 
     rendered_path="$(mktemp)"
     render_template_fixture "$path" "$rendered_path"

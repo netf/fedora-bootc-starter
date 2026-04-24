@@ -168,7 +168,10 @@ EOF
     )" || fail "expected make iso to succeed with only INSTALL_LUKS_PASSPHRASE set"
 
     [[ -f "$config_capture" ]] || fail "expected fake podman to capture rendered config"
-    assert_file_contains "$config_capture" "user --name=netf --groups=wheel --iscrypted --password='$default_hash'"
+    assert_file_contains "$config_capture" '[[customizations.user]]'
+    assert_file_contains "$config_capture" 'name = "netf"'
+    assert_file_contains "$config_capture" 'groups = ["wheel"]'
+    assert_file_contains "$config_capture" "password = \"$default_hash\""
     [[ "$output" == *"ISO ready: $output_dir/bootiso/install.iso"* ]] || fail "expected make iso success output"
 
     output="$(
@@ -185,7 +188,7 @@ EOF
     )" || fail "expected make iso to succeed with stubbed podman"
 
     [[ -f "$config_capture" ]] || fail "expected fake podman to capture rendered config"
-    assert_file_contains "$config_capture" "user --name=netf --groups=wheel --iscrypted --password='\$6\$override\$hash-value'"
+    assert_file_contains "$config_capture" 'password = "$6$override$hash-value"'
     [[ "$output" == *"ISO ready: $output_dir/bootiso/install.iso"* ]] || fail "expected make iso success output"
 
     rm -rf "$stub_dir" "$log_dir" "${REPO_ROOT:?}/$output_dir"

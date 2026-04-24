@@ -47,10 +47,25 @@ def escape_toml_basic_string(value: str) -> str:
         fail("EXTRA_KERNEL_APPEND must not contain control characters")
     return json.dumps(value)[1:-1]
 
+def default_user_block(password_hash: str) -> str:
+    if not password_hash:
+        fail("ADMIN_PASSWORD_HASH must be set when EXTRA_USER_BLOCKS is empty")
+    escaped_hash = escape_toml_basic_string(password_hash)
+    return (
+        "[[customizations.user]]\n"
+        'name = "netf"\n'
+        'groups = ["wheel"]\n'
+        f'password = "{escaped_hash}"\n'
+    )
+
+
+user_blocks = os.environ["EXTRA_USER_BLOCKS"]
+if not user_blocks.strip():
+    user_blocks = default_user_block(os.environ["ADMIN_PASSWORD_HASH"])
+
 replacements = {
     "{{INSTALL_LUKS_PASSPHRASE}}": validate_passphrase(os.environ["INSTALL_LUKS_PASSPHRASE"]),
-    "{{ADMIN_PASSWORD_HASH}}": os.environ["ADMIN_PASSWORD_HASH"],
-    "{{EXTRA_USER_BLOCKS}}": os.environ["EXTRA_USER_BLOCKS"],
+    "{{EXTRA_USER_BLOCKS}}": user_blocks,
     "{{EXTRA_KERNEL_APPEND}}": escape_toml_basic_string(os.environ["EXTRA_KERNEL_APPEND"]),
 }
 
