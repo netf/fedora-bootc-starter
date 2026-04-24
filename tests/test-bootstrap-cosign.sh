@@ -2,6 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
+
 SCRIPT="$REPO_ROOT/scripts/bootstrap-cosign.sh"
 TMP_ROOT="$(mktemp -d)"
 
@@ -9,11 +12,6 @@ cleanup() {
     rm -rf "$TMP_ROOT"
 }
 trap cleanup EXIT
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
 
 assert_contains() {
     local haystack="$1"

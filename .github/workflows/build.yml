@@ -117,7 +117,7 @@ jobs:
             test -x /usr/share/bootstrap/core/13-luks-wipe-installer.sh
             test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh
             test -x /usr/share/bootstrap/hardware/30-fingerprint-enroll.sh
-            grep -q '^ExecStart=/usr/share/bootstrap/run-profile.sh core$' /usr/lib/systemd/system/netf-bootstrap.service
+            grep -q "^ExecStart=/usr/share/bootstrap/run-profile.sh core$" /usr/lib/systemd/system/netf-bootstrap.service
             for s in /usr/share/bootstrap/core/[0-9]*.sh \
                      /usr/share/bootstrap/hardware/[0-9]*.sh; do
               test -x "$s"
@@ -147,7 +147,7 @@ jobs:
             ! command -v jq
             ! command -v starship
 
-            KVER=$(ls /usr/lib/modules | head -1)
+            KVER=$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort -V | tail -1)
             lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q cryptsetup
             lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q tpm2
             lsinitrd /usr/lib/modules/$KVER/initramfs.img | grep -q ostree

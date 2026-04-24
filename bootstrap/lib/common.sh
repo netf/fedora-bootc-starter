@@ -60,7 +60,6 @@ has_token() {
 }
 
 # Marker files for per-step idempotency.
-marker_done()  { [[ -f "/var/lib/bootstrap/.${1}.done" ]]; }
 marker_write() { mkdir -p /var/lib/bootstrap && touch "/var/lib/bootstrap/.${1}.done"; }
 
 # Marker files for boot-critical changes that require initramfs regeneration.

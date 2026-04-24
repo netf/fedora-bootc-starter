@@ -2,69 +2,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_not_exists() {
-    local path="$1"
-
-    [[ ! -e "$path" ]] || fail "expected file to not exist: $path"
-}
-
-assert_file_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
-}
-
-assert_file_not_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 assert_toml_parses() {
     local path="$1"
 
     python3 -c "import tomllib; tomllib.load(open('$path', 'rb'))" >/dev/null \
         || fail "invalid TOML: $path"
-}
-
-assert_command_fails_contains() {
-    local needle="$1"
-    shift
-
-    local output
-    if output="$("$@" 2>&1)"; then
-        fail "expected command to fail: $*"
-    fi
-
-    [[ "$output" == *"$needle"* ]] || fail "expected command failure to contain: $needle"
-}
-
-assert_command_succeeds_contains() {
-    local needle="$1"
-    shift
-
-    local output
-    if ! output="$("$@" 2>&1)"; then
-        fail "expected command to succeed: $*"
-    fi
-
-    [[ "$output" == *"$needle"* ]] || fail "expected command output to contain: $needle"
 }
 
 assert_kernel_append_equals() {
@@ -120,8 +65,8 @@ test_config_toml_template() {
     local path="$REPO_ROOT/config.toml.in"
     local rendered_path
 
-    assert_file_not_exists "$REPO_ROOT/config.toml"
-    assert_file_not_exists "$REPO_ROOT/config-ci.toml"
+    assert_file_missing "$REPO_ROOT/config.toml"
+    assert_file_missing "$REPO_ROOT/config-ci.toml"
     [[ -f "$path" ]] || fail "missing file: $path"
     assert_file_contains "$path" "{{INSTALL_LUKS_PASSPHRASE}}"
     assert_file_contains "$path" "{{ADMIN_PASSWORD_HASH}}"

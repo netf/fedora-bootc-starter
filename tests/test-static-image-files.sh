@@ -2,28 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_matches() {
-    local path="$1"
-    local expected="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == "$expected" ]] || fail "unexpected contents in $path"
-}
-
-assert_file_missing() {
-    local path="$1"
-
-    [[ ! -e "$path" ]] || fail "expected path to be absent: $path"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 test_motd() {
     local expected

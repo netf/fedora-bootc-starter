@@ -2,22 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 test_test_vm_script() {
     local path="$REPO_ROOT/scripts/test-vm.sh"

@@ -2,33 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
-}
-
-assert_file_not_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 test_build_workflow() {
     local path="$REPO_ROOT/.github/workflows/build.yml"
@@ -101,7 +76,7 @@ test_build_workflow() {
     assert_file_contains "$path" "test -x /usr/share/bootstrap/core/13-luks-wipe-installer.sh"
     assert_file_contains "$path" "test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh"
     assert_file_contains "$path" "test -x /usr/share/bootstrap/hardware/30-fingerprint-enroll.sh"
-    assert_file_contains "$path" "grep -q '^ExecStart=/usr/share/bootstrap/run-profile.sh core$' /usr/lib/systemd/system/netf-bootstrap.service"
+    assert_file_contains "$path" "grep -q \"^ExecStart=/usr/share/bootstrap/run-profile.sh core\$\" /usr/lib/systemd/system/netf-bootstrap.service"
     assert_file_contains "$path" "lsinitrd /usr/lib/modules/\$KVER/initramfs.img | grep -q cryptsetup"
     assert_file_contains "$path" "lsinitrd /usr/lib/modules/\$KVER/initramfs.img | grep -q tpm2"
     assert_file_not_contains "$path" "sbctl"

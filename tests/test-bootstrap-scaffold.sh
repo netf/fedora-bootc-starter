@@ -2,44 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_matches() {
-    local path="$1"
-    local expected="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == "$expected" ]] || fail "unexpected contents in $path"
-}
-
-assert_file_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
-}
-
-assert_file_not_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 test_netf_bootstrap_service() {
     local expected
@@ -85,7 +49,6 @@ test_common_library() {
     assert_file_contains "$path" "luks_device() {"
     assert_file_contains "$path" "crypt_mapper_name() {"
     assert_file_contains "$path" "has_token() {"
-    assert_file_contains "$path" "marker_done()  { [[ -f \"/var/lib/bootstrap/.\${1}.done\" ]]; }"
     assert_file_contains "$path" "marker_write() { mkdir -p /var/lib/bootstrap && touch \"/var/lib/bootstrap/.\${1}.done\"; }"
     assert_file_contains "$path" "boot_artifacts_dirty() { [[ -f /var/lib/bootstrap/.boot-artifacts-dirty ]]; }"
     assert_file_contains "$path" "mark_boot_artifacts_dirty() { mkdir -p /var/lib/bootstrap && touch /var/lib/bootstrap/.boot-artifacts-dirty; }"

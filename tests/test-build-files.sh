@@ -2,45 +2,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-assert_file_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" == *"$needle"* ]] || fail "expected $path to contain: $needle"
-}
-
-assert_file_not_contains() {
-    local path="$1"
-    local needle="$2"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-
-    local actual
-    actual="$(<"$path")"
-    [[ "$actual" != *"$needle"* ]] || fail "expected $path to not contain: $needle"
-}
-
-assert_command_fails_contains() {
-    local needle="$1"
-    shift
-
-    local output
-    if output="$("$@" 2>&1)"; then
-        fail "expected command to fail: $*"
-    fi
-
-    [[ "$output" == *"$needle"* ]] || fail "expected command failure to contain: $needle"
-}
+# shellcheck source=lib/assert.sh
+source "$REPO_ROOT/tests/lib/assert.sh"
 
 extract_makefile_default_admin_hash() {
     local path="$REPO_ROOT/Makefile"
