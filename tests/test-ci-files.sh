@@ -38,7 +38,7 @@ test_build_workflow() {
     assert_file_contains "$path" "--type anaconda-iso --rootfs btrfs --config /config.toml"
     assert_file_contains "$path" "Create blank target disk"
     assert_file_contains "$path" "qemu-img create -f qcow2 target.qcow2"
-    assert_file_contains "$path" "media=cdrom,if=ide,readonly=on"
+    assert_file_contains "$path" "media=cdrom,readonly=on"
     assert_file_contains "$path" "Extract anaconda kernel + initrd from ISO"
     assert_file_contains "$path" "xorriso -osirrox on -indev"
     assert_file_contains "$path" "-kernel iso-extract/vmlinuz"
