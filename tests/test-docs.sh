@@ -47,12 +47,23 @@ test_readme() {
     assert_file_not_contains "$path" "sbctl"
 }
 
+test_guide() {
+    local path="$REPO_ROOT/guide.md"
+
+    [[ -f "$path" ]] || fail "missing file: $path"
+    assert_file_contains "$path" "Render encrypted installer config"
+    assert_file_contains "$path" "./scripts/render-installer-config.sh > config-ci-rendered.toml"
+    assert_file_contains "$path" "--type qcow2 --rootfs btrfs --config /config.toml"
+    assert_file_not_contains "$path" "CI variant: no LUKS"
+    assert_file_not_contains "$path" "cat > config-ci.toml"
+}
+
 run_tests() {
     local tests=("$@")
     local test_name
 
     if [[ ${#tests[@]} -eq 0 ]]; then
-        tests=(test_readme)
+        tests=(test_readme test_guide)
     fi
 
     for test_name in "${tests[@]}"; do

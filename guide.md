@@ -1055,22 +1055,31 @@ jobs:
         run: |
           ssh-keygen -t ed25519 -N '' -f ci-key -C "ci@github-actions"
 
-      - name: Write CI-mode bootc-image-builder config
+      - name: Generate CI installer passphrase
         run: |
-          # CI variant: no LUKS, SSH key injected, qcow2 output
-          cat > config-ci.toml <<EOF
+          INSTALL_LUKS_PASSPHRASE="$(openssl rand -base64 24)"
+          echo "::add-mask::$INSTALL_LUKS_PASSPHRASE"
+          echo "INSTALL_LUKS_PASSPHRASE=$INSTALL_LUKS_PASSPHRASE" >> "$GITHUB_ENV"
+          echo 'ADMIN_PASSWORD_HASH=$6$YdvxSXl6YUHhOzEf$YTvt9PEWKWpTVcb.Y4N/Qlwp.cpMmQbegc8OIFsturFPjOtuYWw4Uzwy5dHlwNiqqiaMd9mfUlJH6wn.EA1Wo0' >> "$GITHUB_ENV"
+          echo "EXTRA_KERNEL_APPEND=console=ttyS0,115200 rd.debug systemd.log_level=debug systemd.log_target=console" >> "$GITHUB_ENV"
+
+      - name: Render encrypted installer config
+        run: |
+          pubkey="$(cat ci-key.pub)"
+          EXTRA_USER_BLOCKS="$(cat <<EOF
           [[customizations.user]]
           name = "netf"
           groups = ["wheel"]
-          key = "$(cat ci-key.pub)"
+          key = "$pubkey"
 
           [[customizations.user]]
           name = "root"
-          key = "$(cat ci-key.pub)"
-
-          [customizations.kernel]
-          append = "console=ttyS0,115200"
+          key = "$pubkey"
           EOF
+          )"
+          export EXTRA_USER_BLOCKS
+          ./scripts/render-installer-config.sh > config-ci-rendered.toml
+          python3 -c "import tomllib; tomllib.load(open('config-ci-rendered.toml','rb'))"
 
       - name: Build qcow2
         run: |
@@ -1081,7 +1090,7 @@ jobs:
               -v $PWD/config-ci-rendered.toml:/config.toml:ro \
               -v $PWD/output:/output \
               quay.io/centos-bootc/bootc-image-builder:latest \
-              --type qcow2 --config /config.toml \
+              --type qcow2 --rootfs btrfs --config /config.toml \
               localhost/test-image:ci
           sudo chown -R $USER output
           ls -lh output/qcow2/

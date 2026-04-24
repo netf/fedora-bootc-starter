@@ -59,7 +59,6 @@ jobs:
             ./scripts/render-installer-config.sh > "$RENDERED_CONFIG"
           python3 -c "import tomllib; tomllib.load(open('$RENDERED_CONFIG','rb'))"
           rm -f "$RENDERED_CONFIG"
-          python3 -c "import tomllib; tomllib.load(open('config-ci.toml','rb'))"
 
   build:
     needs: lint
@@ -228,10 +227,31 @@ jobs:
       - name: Generate CI SSH keypair
         run: ssh-keygen -t ed25519 -N '' -f ci-key -C "ci@github-actions"
 
-      - name: Render config-ci.toml with CI pubkey
+      - name: Generate CI installer passphrase
         run: |
-          sed "s|{{CI_PUBKEY}}|$(cat ci-key.pub)|g" config-ci.toml > config-ci-rendered.toml
-          cat config-ci-rendered.toml
+          INSTALL_LUKS_PASSPHRASE="$(openssl rand -base64 24)"
+          echo "::add-mask::$INSTALL_LUKS_PASSPHRASE"
+          echo "INSTALL_LUKS_PASSPHRASE=$INSTALL_LUKS_PASSPHRASE" >> "$GITHUB_ENV"
+          echo 'ADMIN_PASSWORD_HASH=$6$YdvxSXl6YUHhOzEf$YTvt9PEWKWpTVcb.Y4N/Qlwp.cpMmQbegc8OIFsturFPjOtuYWw4Uzwy5dHlwNiqqiaMd9mfUlJH6wn.EA1Wo0' >> "$GITHUB_ENV"
+          echo "EXTRA_KERNEL_APPEND=console=ttyS0,115200 rd.debug systemd.log_level=debug systemd.log_target=console" >> "$GITHUB_ENV"
+
+      - name: Render encrypted installer config
+        run: |
+          pubkey="$(cat ci-key.pub)"
+          EXTRA_USER_BLOCKS="$(cat <<EOF
+          [[customizations.user]]
+          name = "netf"
+          groups = ["wheel"]
+          key = "$pubkey"
+
+          [[customizations.user]]
+          name = "root"
+          key = "$pubkey"
+          EOF
+          )"
+          export EXTRA_USER_BLOCKS
+          ./scripts/render-installer-config.sh > config-ci-rendered.toml
+          python3 -c "import tomllib; tomllib.load(open('config-ci-rendered.toml','rb'))"
 
       - name: Build qcow2
         run: |

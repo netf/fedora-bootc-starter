@@ -116,24 +116,12 @@ output_path.write_text(rendered)
 PY
 }
 
-test_config_ci_toml() {
-    local path="$REPO_ROOT/config-ci.toml"
-
-    [[ -f "$path" ]] || fail "missing file: $path"
-    assert_toml_parses "$path"
-    assert_file_contains "$path" "[[customizations.user]]"
-    assert_file_contains "$path" "name = \"netf\""
-    assert_file_contains "$path" "name = \"root\""
-    assert_file_contains "$path" "key = \"{{CI_PUBKEY}}\""
-    assert_file_contains "$path" "[customizations.kernel]"
-    assert_file_contains "$path" "append = \"console=ttyS0,115200 rd.debug systemd.log_level=debug systemd.log_target=console\""
-}
-
 test_config_toml_template() {
     local path="$REPO_ROOT/config.toml.in"
     local rendered_path
 
     assert_file_not_exists "$REPO_ROOT/config.toml"
+    assert_file_not_exists "$REPO_ROOT/config-ci.toml"
     [[ -f "$path" ]] || fail "missing file: $path"
     assert_file_contains "$path" "{{INSTALL_LUKS_PASSPHRASE}}"
     assert_file_contains "$path" "{{ADMIN_PASSWORD_HASH}}"
@@ -257,7 +245,6 @@ run_tests() {
             test_render_installer_config_script_rejects_multiline_kernel_append
             test_render_installer_config_script_rejects_unknown_leftover_placeholders
             test_guide_documents_rendered_installer_template
-            test_config_ci_toml
         )
     fi
 
