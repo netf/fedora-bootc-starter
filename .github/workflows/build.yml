@@ -276,49 +276,76 @@ jobs:
               --ctrl type=unixio,path=/tmp/swtpm/sock \
               --log level=5 --daemon
 
-      - name: Extract anaconda kernel + initrd from ISO
+      - name: Patch installer ISO for headless serial console
         run: |
-          ISO=$(ls output/bootiso/*.iso | head -1)
-          test -f "$ISO" || { echo "no installer iso produced"; exit 1; }
-          echo "Using installer ISO: $ISO"
-          echo "ISO=$ISO" >> "$GITHUB_ENV"
+          # bib's anaconda-iso ships a GRUB config that assumes a physical
+          # display. On this headless runner we need anaconda to run on
+          # serial so we can watch it + drive it. Patch the boot configs
+          # to add `console=ttyS0,115200 inst.text` to every kernel line,
+          # then repack the ISO while preserving the hybrid-boot metadata.
+          ISO_IN=$(ls output/bootiso/*.iso | head -1)
+          test -f "$ISO_IN" || { echo "no installer iso produced"; exit 1; }
+          ISO_OUT="$PWD/installer-patched.iso"
 
-          mkdir -p iso-extract
-          xorriso -osirrox on -indev "$ISO" -extract /images/pxeboot iso-extract/
-          test -f iso-extract/vmlinuz \
-            || { echo "vmlinuz not found in ISO /images/pxeboot"; ls -R iso-extract; exit 1; }
-          test -f iso-extract/initrd.img \
-            || { echo "initrd.img not found in ISO /images/pxeboot"; ls -R iso-extract; exit 1; }
-          ls -lh iso-extract/
+          mkdir -p iso-work
+          xorriso -osirrox on -indev "$ISO_IN" -extract / iso-work/
+          chmod -R u+w iso-work/
+
+          echo "--- original EFI/BOOT/grub.cfg ---"
+          cat iso-work/EFI/BOOT/grub.cfg || true
+          echo "--- original isolinux.cfg ---"
+          cat iso-work/isolinux/isolinux.cfg 2>/dev/null || true
+
+          SERIAL_ARGS="console=ttyS0,115200n8 inst.text"
+
+          if [[ -f iso-work/EFI/BOOT/grub.cfg ]]; then
+            sed -i -E "/^[[:space:]]*linux[[:space:]]/ s|\$| $SERIAL_ARGS|" iso-work/EFI/BOOT/grub.cfg
+            sed -i -E 's|^(set[[:space:]]+timeout=)[0-9]+|\11|' iso-work/EFI/BOOT/grub.cfg
+          fi
+          if [[ -f iso-work/isolinux/isolinux.cfg ]]; then
+            sed -i -E "/^[[:space:]]*append[[:space:]]/ s|\$| $SERIAL_ARGS|" iso-work/isolinux/isolinux.cfg
+            sed -i -E 's|^(timeout[[:space:]]+)[0-9]+|\110|' iso-work/isolinux/isolinux.cfg
+          fi
+
+          echo "--- patched EFI/BOOT/grub.cfg ---"
+          cat iso-work/EFI/BOOT/grub.cfg || true
+          echo "--- patched isolinux.cfg ---"
+          cat iso-work/isolinux/isolinux.cfg 2>/dev/null || true
+
+          # Replay boot image metadata from the source ISO, overlay our
+          # patched files. This preserves El Torito + Joliet + Rock Ridge
+          # without us having to reconstruct the full mkisofs recipe.
+          xorriso -indev "$ISO_IN" \
+                  -outdev "$ISO_OUT" \
+                  -boot_image any replay \
+                  -update_r iso-work/ /
+          ls -lh "$ISO_OUT"
+          echo "ISO=$ISO_OUT" >> "$GITHUB_ENV"
 
       - name: Run anaconda install (phase 1)
         timeout-minutes: 25
         run: |
-          # Fedora's anaconda ISO boots via GRUB with kernel args that don't
-          # redirect to serial, and this runner is headless — we'd have no
-          # visibility into anaconda. Instead, boot the ISO's kernel directly
-          # with our own cmdline (inst.text + console=ttyS0) and let anaconda
-          # locate its stage2 + embedded kickstart from the ISO attached as
-          # cdrom. -no-reboot makes QEMU exit on `reboot --eject` so we
-          # don't loop back into the installer.
+          # Boot the patched ISO normally via OVMF. The patched GRUB/isolinux
+          # configs add `console=ttyS0 inst.text`, so anaconda runs on serial
+          # and we can watch install progress. -no-reboot causes QEMU to
+          # exit on anaconda's `reboot --eject` so we don't loop back into
+          # the installer.
+          cp "$OVMF_VARS_TEMPLATE" anaconda-ovmf-vars.fd
+          chmod u+w anaconda-ovmf-vars.fd
           : > anaconda-serial.log
           : > anaconda-qemu.log
 
-          # i440fx/pc + SeaBIOS is the path-of-least-surprise for direct
-          # `-kernel` boot. OVMF + `-kernel` on q35 is known to produce
-          # no kernel output on some QEMU builds. Phase 2 still uses OVMF
-          # for the installed-system measured-boot test.
           set +e
           qemu-system-x86_64 \
-            -machine pc,accel=kvm -cpu host -m 4G -smp 2 \
+            -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE \
+            -drive if=pflash,format=raw,file=anaconda-ovmf-vars.fd \
             -chardev socket,id=chrtpm,path=/tmp/swtpm/sock \
             -tpmdev emulator,id=tpm0,chardev=chrtpm \
-            -device tpm-tis,tpmdev=tpm0 \
+            -device tpm-crb,tpmdev=tpm0 \
             -drive file=target.qcow2,if=virtio,format=qcow2 \
             -drive file="$ISO",media=cdrom,readonly=on \
-            -kernel iso-extract/vmlinuz \
-            -initrd iso-extract/initrd.img \
-            -append "console=ttyS0,115200n8 earlyprintk=ttyS0,115200 rd.info inst.text inst.stage2=hd:/dev/sr0 inst.ks=cdrom" \
+            -boot order=d \
             -netdev user,id=n0 \
             -device virtio-net-pci,netdev=n0 \
             -nographic -serial file:anaconda-serial.log -monitor none \
