@@ -281,6 +281,14 @@ jobs:
           chmod u+w ovmf-vars.fd
           : > vm-serial.log
           : > qemu-launch.log
+          rm -f vm-serial.in vm-serial.out
+          mkfifo vm-serial.in vm-serial.out
+
+          tail -f vm-serial.out > vm-serial.log &
+          echo $! > serial-tail.pid
+
+          tail -f /dev/null > vm-serial.in &
+          echo $! > serial-stdin-holder.pid
 
           qemu-system-x86_64 \
             -machine q35,accel=kvm -cpu host -m 4G -smp 2 \
@@ -292,7 +300,7 @@ jobs:
             -drive file=output/qcow2/disk.qcow2,if=virtio,format=qcow2 \
             -netdev user,id=n0,hostfwd=tcp::2222-:22 \
             -device virtio-net-pci,netdev=n0 \
-            -nographic -serial file:vm-serial.log \
+            -nographic -serial pipe:vm-serial \
             -display none \
             > qemu-launch.log 2>&1 &
           echo $! > qemu.pid
@@ -303,6 +311,27 @@ jobs:
             tail -n 200 vm-serial.log || true
             exit 1
           fi
+
+      - name: Unlock first encrypted boot over serial
+        run: |
+          for i in {1..120}; do
+            if grep -qi 'Passphrase' vm-serial.log; then
+              printf '%s\n' "$INSTALL_LUKS_PASSPHRASE" > vm-serial.in
+              echo "sent LUKS passphrase over serial"
+              exit 0
+            fi
+            if [[ -f qemu.pid ]] && ! kill -0 "$(cat qemu.pid)" 2>/dev/null; then
+              echo "QEMU exited before LUKS passphrase prompt"
+              tail -n 200 qemu-launch.log || true
+              tail -n 200 vm-serial.log || true
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "LUKS passphrase prompt never appeared"
+          tail -n 200 qemu-launch.log || true
+          tail -n 200 vm-serial.log || true
+          exit 1
 
       - name: Wait for SSH (up to 5 min)
         run: |
@@ -369,6 +398,8 @@ jobs:
               -p 2222 root@localhost 'systemctl poweroff' || true
           sleep 5
           [[ -f qemu.pid ]] && kill -9 "$(cat qemu.pid)" 2>/dev/null || true
+          [[ -f serial-tail.pid ]] && kill -9 "$(cat serial-tail.pid)" 2>/dev/null || true
+          [[ -f serial-stdin-holder.pid ]] && kill -9 "$(cat serial-stdin-holder.pid)" 2>/dev/null || true
 
       - name: Upload VM logs on failure
         if: failure()
