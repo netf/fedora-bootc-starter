@@ -23,9 +23,6 @@ firstboot --disable
 reboot --eject
 """
 
-[customizations.installer.modules]
-disable = ["org.fedoraproject.Anaconda.Modules.Users"]
-
 {{EXTRA_USER_BLOCKS}}
 [customizations.kernel]
 append = "{{EXTRA_KERNEL_APPEND}}"
