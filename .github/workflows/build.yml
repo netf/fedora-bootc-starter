@@ -384,6 +384,22 @@ jobs:
           fi
           echo "Phase 1 complete: anaconda install finished."
 
+      - name: Restart swtpm (preserve state dir)
+        run: |
+          # swtpm exits when phase-1 QEMU disconnects at `-no-reboot`;
+          # bring it back up reusing the same state directory so PCRs
+          # are consistent across the measured-boot enroll step below.
+          pkill -f 'swtpm socket' || true
+          rm -f /tmp/swtpm/sock
+          swtpm socket --tpm2 --tpmstate dir=/tmp/swtpm \
+              --ctrl type=unixio,path=/tmp/swtpm/sock \
+              --log level=5 --daemon
+          for _ in 1 2 3 4 5; do
+            [[ -S /tmp/swtpm/sock ]] && break
+            sleep 1
+          done
+          [[ -S /tmp/swtpm/sock ]] || { echo "swtpm socket never came up"; exit 1; }
+
       - name: Boot installed system (phase 2, first encrypted boot)
         run: |
           cp "$OVMF_VARS_TEMPLATE" ovmf-vars.fd
