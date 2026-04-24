@@ -318,7 +318,7 @@ jobs:
             -drive file="$ISO",media=cdrom,readonly=on \
             -kernel iso-extract/vmlinuz \
             -initrd iso-extract/initrd.img \
-            -append "console=ttyS0,115200n8 earlyprintk=ttyS0,115200 inst.text inst.stage2=hd:LABEL=FEDORA-BOOTC-STARTER inst.ks=cdrom" \
+            -append "console=ttyS0,115200n8 earlyprintk=ttyS0,115200 rd.info inst.text inst.stage2=hd:/dev/sr0 inst.ks=cdrom" \
             -netdev user,id=n0 \
             -device virtio-net-pci,netdev=n0 \
             -nographic -serial file:anaconda-serial.log -monitor none \
