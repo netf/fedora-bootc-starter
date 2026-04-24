@@ -62,7 +62,11 @@ COPY cosign.pub /etc/containers/pubkey.pem
 RUN chmod +x /usr/local/bin/framework_tool \
  && curl -fsSL https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh \
  && ostree container commit \
- && chmod +x /usr/share/bootstrap/*.sh /usr/share/bootstrap/lib/*.sh \
+ && chmod +x /usr/share/bootstrap/*.sh /usr/share/bootstrap/core/*.sh /usr/share/bootstrap/hardware/*.sh /usr/share/bootstrap/lib/*.sh \
+ && test -x /usr/share/bootstrap/run-profile.sh \
+ && test -x /usr/share/bootstrap/core/10-luks-tpm2.sh \
+ && test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh \
+ && grep -q '^ExecStart=/usr/share/bootstrap/run-profile.sh core$' /usr/lib/systemd/system/netf-bootstrap.service \
  && grep -q "/etc/containers/pubkey.pem" /etc/containers/policy.json \
  && test -f /etc/containers/pubkey.pem \
  && echo "signature policy wired correctly" \

@@ -21,7 +21,11 @@ podman pull --quiet "$IMAGE_REF" > /dev/null
 echo "Running smoke test inside image"
 podman run --rm "$IMAGE_REF" bash -c '
     set -e
-    test -x /usr/share/bootstrap/run-all.sh
+    test -x /usr/share/bootstrap/run-profile.sh
+    test -x /usr/share/bootstrap/core/10-luks-tpm2.sh
+    test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh
+    grep -q "^ExecStart=/usr/share/bootstrap/run-profile.sh core$" /usr/lib/systemd/system/netf-bootstrap.service
+    systemctl is-enabled netf-bootstrap.service >/dev/null
     test -f /usr/lib/bootc/kargs.d/10-fw13.toml
     test -f /etc/containers/policy.json
     test -f /etc/containers/pubkey.pem

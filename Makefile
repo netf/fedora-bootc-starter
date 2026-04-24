@@ -31,7 +31,10 @@ inspect: build  ## Smoke test the built image
 	sudo podman run --rm $(IMAGE_REF) bootc container lint
 	sudo podman run --rm $(IMAGE_REF) bash -c '\
 	  set -e; \
-	  test -x /usr/share/bootstrap/run-all.sh; \
+	  test -x /usr/share/bootstrap/run-profile.sh; \
+	  test -x /usr/share/bootstrap/core/10-luks-tpm2.sh; \
+	  test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh; \
+	  grep -q "^ExecStart=/usr/share/bootstrap/run-profile.sh core$$" /usr/lib/systemd/system/netf-bootstrap.service; \
 	  test -f /usr/lib/bootc/kargs.d/10-fw13.toml; \
 	  systemctl is-enabled netf-bootstrap.service; \
 	  command -v chezmoi mise alacritty distrobox tailscale framework_tool fwupdmgr tpm2_pcrread ykman; \

@@ -71,10 +71,16 @@ test_containerfile() {
     assert_file_contains "$path" "sbsigntools"
     assert_file_not_contains "$path" "sbctl"
     assert_file_not_contains "$path" "/usr/etc"
+    assert_file_contains "$path" "chmod +x /usr/share/bootstrap/*.sh /usr/share/bootstrap/core/*.sh /usr/share/bootstrap/hardware/*.sh /usr/share/bootstrap/lib/*.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/run-profile.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/core/10-luks-tpm2.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh"
+    assert_file_contains "$path" "grep -q '^ExecStart=/usr/share/bootstrap/run-profile.sh core$' /usr/lib/systemd/system/netf-bootstrap.service"
     assert_file_contains "$path" "dracut.conf.d/50-luks-unlock.conf"
     assert_file_contains "$path" "add_dracutmodules+=\" crypt tpm2-tss systemd-cryptsetup fido2 systemd ostree \""
     assert_file_contains "$path" "/usr/lib/bootc/kargs.d/10-fw13.toml"
     assert_file_contains "$path" "systemctl enable sshd.service"
+    assert_file_contains "$path" "systemctl enable netf-bootstrap.service"
     assert_file_contains "$path" "bootc container lint"
 }
 
@@ -91,6 +97,11 @@ test_makefile() {
     assert_file_contains "$path" "iso: build  ## Build the unattended installer ISO"
     assert_file_contains "$path" "export INSTALL_LUKS_PASSPHRASE ?="
     assert_file_contains "$path" "export ADMIN_PASSWORD_HASH ?="
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/run-profile.sh;"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/core/10-luks-tpm2.sh;"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh;"
+    assert_file_contains "$path" 'grep -q "^ExecStart=/usr/share/bootstrap/run-profile.sh core$$" /usr/lib/systemd/system/netf-bootstrap.service;'
+    assert_file_contains "$path" "systemctl is-enabled netf-bootstrap.service;"
     assert_file_contains "$path" "--type anaconda-iso --rootfs btrfs"
     assert_file_contains "$path" "test-vm: iso  ## Boot the ISO in QEMU with swtpm for end-to-end testing"
 }

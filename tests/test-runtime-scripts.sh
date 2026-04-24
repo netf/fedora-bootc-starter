@@ -42,7 +42,11 @@ test_verify_image_script() {
     assert_file_contains "$path" "cosign verify --key \"\$PUBKEY\" \"\$IMAGE_REF\" > /dev/null"
     assert_file_contains "$path" "podman pull --quiet \"\$IMAGE_REF\" > /dev/null"
     assert_file_contains "$path" "podman run --rm \"\$IMAGE_REF\" bash -c '"
-    assert_file_contains "$path" "test -x /usr/share/bootstrap/run-all.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/run-profile.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/core/10-luks-tpm2.sh"
+    assert_file_contains "$path" "test -x /usr/share/bootstrap/hardware/11-luks-fido2.sh"
+    assert_file_contains "$path" 'grep -q "^ExecStart=/usr/share/bootstrap/run-profile.sh core$" /usr/lib/systemd/system/netf-bootstrap.service'
+    assert_file_contains "$path" "systemctl is-enabled netf-bootstrap.service >/dev/null"
     assert_file_contains "$path" "test -f /etc/containers/pubkey.pem"
     assert_file_contains "$path" "command -v chezmoi mise alacritty distrobox tailscale framework_tool >/dev/null"
 }
