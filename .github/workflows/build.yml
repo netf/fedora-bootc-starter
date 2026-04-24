@@ -409,7 +409,11 @@ jobs:
           rm -f vm-serial.in vm-serial.out
           mkfifo vm-serial.in vm-serial.out
 
-          tail -f vm-serial.out > vm-serial.log &
+          # stdbuf -o0 so partial lines (e.g. passphrase prompt without a
+          # trailing newline) reach vm-serial.log immediately; default
+          # block-buffering hid the LUKS prompt from the grep-based
+          # injection loop.
+          stdbuf -o0 tail -f vm-serial.out > vm-serial.log &
           echo $! > serial-tail.pid
 
           tail -f /dev/null > vm-serial.in &
