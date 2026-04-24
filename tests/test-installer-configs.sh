@@ -77,7 +77,9 @@ test_config_toml_template() {
     render_template_fixture "$path" "$rendered_path"
     assert_toml_parses "$rendered_path"
     assert_file_contains "$rendered_path" "[customizations.installer.kickstart]"
-    assert_file_contains "$rendered_path" "part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=fixture-passphrase"
+    assert_file_contains "$rendered_path" "part btrfs.01 --size=1 --grow --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=fixture-passphrase"
+    assert_file_contains "$rendered_path" "btrfs none --label=fedora btrfs.01"
+    assert_file_contains "$rendered_path" "btrfs / --subvol --name=root fedora"
     assert_file_contains "$rendered_path" "user --name=netf --groups=wheel --iscrypted --password='\$6\$fixture\$hashed-admin-password'"
     assert_file_contains "$rendered_path" "sshkey --username=root"
 }
@@ -101,7 +103,9 @@ test_render_installer_config_script() {
 
     assert_toml_parses "$rendered_path"
     assert_file_contains "$rendered_path" "[customizations.installer.kickstart]"
-    assert_file_contains "$rendered_path" "part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=rendered-passphrase"
+    assert_file_contains "$rendered_path" "part btrfs.01 --size=1 --grow --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase=rendered-passphrase"
+    assert_file_contains "$rendered_path" "btrfs none --label=fedora btrfs.01"
+    assert_file_contains "$rendered_path" "btrfs / --subvol --name=root fedora"
     assert_file_contains "$rendered_path" "user --name=netf --groups=wheel --iscrypted --password='\$6\$fixture\$hashed-admin-password'"
     assert_file_contains "$rendered_path" "sshkey --username=root"
     assert_file_contains "$rendered_path" "[customizations.kernel]"

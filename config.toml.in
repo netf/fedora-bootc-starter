@@ -16,7 +16,9 @@ network --bootproto=dhcp --device=link --activate --hostname=fw13
 zerombr
 clearpart --all --initlabel --disklabel=gpt
 reqpart --add-boot
-part / --grow --fstype=btrfs --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase={{INSTALL_LUKS_PASSPHRASE}}
+part btrfs.01 --size=1 --grow --encrypted --luks-version=luks2 --pbkdf=argon2id --passphrase={{INSTALL_LUKS_PASSPHRASE}}
+btrfs none --label=fedora btrfs.01
+btrfs / --subvol --name=root fedora
 
 rootpw --lock
 user --name=netf --groups=wheel --iscrypted --password='{{ADMIN_PASSWORD_HASH}}'
